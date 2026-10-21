@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible error in Agent Runtime Lite
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not post sensitive logs or security vulnerabilities here. See SECURITY.md."
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "v0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Node.js version
+      placeholder: "Windows 11 / Node.js 22"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Minimal reproduction
+      description: Include the smallest safe command and the expected versus actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted logs or additional context
