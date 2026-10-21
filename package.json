@@ -1,0 +1,22 @@
+{
+  "name": "agent-runtime-lite",
+  "version": "0.1.0",
+  "license": "MIT",
+  "main": "./src/runtime.mjs",
+  "exports": "./src/runtime.mjs",
+  "repository": {"type":"git","url":"https://github.com/Sharky0209/agent-runtime-lite.git"},
+  "keywords": ["agent", "task-runtime", "durable-execution", "recovery", "workflow"],
+  "files": ["src/", "bin/", "examples/", "README.md", "README.zh-CN.md", "LICENSE", "docs/"],
+  "description": "Portable, durable task and job execution with evidence-based completion.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "arl": "./bin/arl.mjs"
+  },
+  "scripts": {
+    "test": "node --test",
+    "example": "node examples/quickstart.mjs"
+  }
+}
