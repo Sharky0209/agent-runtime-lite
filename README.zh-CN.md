@@ -1,8 +1,12 @@
 # Agent Runtime Lite
 
+[![跨平台测试](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
+
+[英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [更新记录](CHANGELOG.md)
+
 一个可本地运行、零第三方 npm 依赖的 **Agent 持久任务运行框架**。目标是让 AI Agent 的工作不会随着一次对话或 CLI 调用结束而失去状态，并把“命令执行成功”和“业务真正完成”分开。
 
-**版本：v0.1.0，MIT 许可证，面向单机任务运行场景。**
+**版本：v0.1.1，MIT 许可证，面向单机任务运行场景。**
 
 ## 核心功能
 
