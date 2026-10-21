@@ -1,8 +1,13 @@
 # Agent Runtime Lite
 
+[![Cross-platform tests](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+[中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Changelog](CHANGELOG.md)
+
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
-Version 0.1.0 · MIT licensed · Built for single-host, recoverable agent workflows.
+Version 0.1.1 · MIT licensed · Built for single-host, recoverable agent workflows.
 
 ## Why this exists
 
