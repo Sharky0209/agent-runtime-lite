@@ -9,6 +9,21 @@
 
 Version 0.1.2 · MIT licensed · Built for single-host, recoverable agent workflows.
 
+## Try the public preview (no source checkout)
+
+From a new, empty directory with Node.js 20+ and npm:
+
+```sh
+npm init -y
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.2/agent-runtime-lite-0.1.2.tgz
+npm exec -- arl --version
+npm exec -- arl --help
+```
+
+This downloads the publicly available **GitHub Release tarball**; the package is not yet published to the npm registry. The direct URL installation was tested in a clean temporary project. To see real detached execution and caller handoff, follow the [five-minute quickstart](docs/QUICKSTART.md).
+
+**First independent users:** share honest installation/use-case feedback in [the public tester thread](https://github.com/Sharky0209/agent-runtime-lite/issues/3). You do not need to star the repository.
+
 ## Why this exists
 
 Agent conversations can end before the work does. A child process exiting successfully also does not prove that a report reached its destination. Agent Runtime Lite separates these concerns:

@@ -8,6 +8,19 @@
 
 **版本：v0.1.2，MIT 许可证，面向单机任务运行场景。**
 
+## 不克隆源码，直接安装体验
+
+新建一个空文件夹，使用 Node.js 20+ 与 npm：
+
+```sh
+npm init -y
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.2/agent-runtime-lite-0.1.2.tgz
+npm exec -- arl --version
+npm exec -- arl --help
+```
+
+这是已验证的 **GitHub Release 安装包**，并非已经发布到 npm 官方包仓库。想查看完整运行、独立进程接力和验收证明，请看 [5 分钟入门](docs/QUICKSTART.md)。欢迎在 [第一批试用者反馈帖](https://github.com/Sharky0209/agent-runtime-lite/issues/3) 反馈真实体验，无需给仓库刷 Star。
+
 ## 核心功能
 
 - **持久任务**：按业务键接收任务，重复请求只返回原任务。

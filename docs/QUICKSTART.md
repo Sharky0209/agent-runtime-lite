@@ -4,6 +4,19 @@
 
 **What it is not:** an AI conversation service, a sandbox for untrusted commands, or distributed failover. This demonstration shows **caller/session handoff**, not that a crashed worker or an OS reboot can be resumed automatically.
 
+## Fastest install: GitHub Release tarball
+
+For a new empty local project (Node.js 20+):
+
+```sh
+npm init -y
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.2/agent-runtime-lite-0.1.2.tgz
+npm exec -- arl --version
+npm exec -- arl --help
+```
+
+This uses a publicly downloadable release asset, **not an npm registry publication**. Downloading/installing the release archive was verified from a separate temporary consumer. Provide your real trial feedback in [the first testers thread](https://github.com/Sharky0209/agent-runtime-lite/issues/3).
+
 ## Clone and test
 
 Prerequisite: Node.js 20+, npm, and Git.
