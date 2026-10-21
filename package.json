@@ -1,6 +1,6 @@
 {
   "name": "agent-runtime-lite",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "main": "./src/runtime.mjs",
   "exports": "./src/runtime.mjs",
@@ -17,6 +17,8 @@
   },
   "scripts": {
     "test": "node --test",
-    "example": "node examples/quickstart.mjs"
+    "example": "node examples/quickstart.mjs",
+    "demo:handoff": "node examples/session-handoff.mjs",
+    "test:package": "node test/package-smoke.mjs"
   }
 }

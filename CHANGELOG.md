@@ -4,6 +4,14 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-21
+
+- Add tested offline tarball installation and separate consumer CLI smoke test.
+- Introduce `--command-file`, `--gate`, `--help`, and `--version` CLI conveniences.
+- Add a real CLI caller/session handoff demo that enforces a readback gate.
+- Add PowerShell and Bash package-install quickstarts verified by cross-platform CI.
+- Publish an adoption/feedback guide with no invented user or integration claims.
+
 ## [0.1.1] - 2026-10-21
 
 - Establish public contribution, security, issue triage, and maintenance guidelines.

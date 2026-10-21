@@ -3,11 +3,11 @@
 [![Cross-platform tests](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Changelog](CHANGELOG.md)
+[5-minute quickstart](docs/QUICKSTART.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Changelog](CHANGELOG.md)
 
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
-Version 0.1.1 · MIT licensed · Built for single-host, recoverable agent workflows.
+Version 0.1.2 · MIT licensed · Built for single-host, recoverable agent workflows.
 
 ## Why this exists
 
@@ -31,7 +31,11 @@ From this directory:
 ```sh
 npm test
 npm run example
+npm run demo:handoff
+npm run test:package
 ```
+
+**New users:** start with the tested [five-minute quickstart](docs/QUICKSTART.md). It includes clean tarball installs in PowerShell and Bash. The package is **not** on the public npm registry yet.
 
 The CLI is `node bin/arl.mjs` (or `arl` after registering the package's bin). Runtime data is created beneath `.arl/` in the chosen `--root` directory.
 
@@ -49,7 +53,7 @@ node bin/arl.mjs complete --root . --job JOB_ID
 node bin/arl.mjs status --root . --task TASK_ID
 ```
 
-If your shell quoting differs, use the JavaScript API below or the working `npm run example` reference. A running job creates a detached worker and records a log in `.arl/logs/`. Successful OS exit moves the job into `completion_candidate`; it does **not** complete automatically.
+For portable JSON arguments without shell escaping issues, supply a JSON file via `--command-file ./command.json` and a single gate with `--gate report_readback`. See the **tested PowerShell and Bash scripts** in the [quickstart](docs/QUICKSTART.md). A running job creates a detached worker and records a log in `.arl/logs/`. Successful OS exit moves the job into `completion_candidate`; it does **not** complete automatically.
 
 ## JavaScript API
 
@@ -105,4 +109,4 @@ Currently not included: automatic verification of arbitrary external side effect
 
 See [architecture and design boundaries](docs/ARCHITECTURE.md). The runtime is in `src/`, the CLI in `bin/`, and the offline/integration tests in `test/`. Contributions, bug reports, and reproducible use cases are welcome.
 
-Distributed coordination, persistent service management, and automated verification of remote side effects are outside the current 0.1.0 scope.
+Distributed coordination, persistent service management, and automated verification of remote side effects are outside the current preview scope. The [adoption and feedback page](docs/ADOPTION.md) invites independent users to report real experiences.

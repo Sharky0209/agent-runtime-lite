@@ -2,11 +2,11 @@
 
 [![跨平台测试](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 
-[英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [更新记录](CHANGELOG.md)
+[5 分钟入门](docs/QUICKSTART.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [更新记录](CHANGELOG.md)
 
 一个可本地运行、零第三方 npm 依赖的 **Agent 持久任务运行框架**。目标是让 AI Agent 的工作不会随着一次对话或 CLI 调用结束而失去状态，并把“命令执行成功”和“业务真正完成”分开。
 
-**版本：v0.1.1，MIT 许可证，面向单机任务运行场景。**
+**版本：v0.1.2，MIT 许可证，面向单机任务运行场景。**
 
 ## 核心功能
 
@@ -25,7 +25,11 @@
 ```sh
 npm test
 npm run example
+npm run demo:handoff
+npm run test:package
 ```
+
+`demo:handoff` 展示原 CLI 会话结束、后续 CLI 读取状态以及核对真实输出后才允许完成任务；它不宣称能自动恢复任意崩溃的 Worker。`test:package` 会将本地 npm 压缩包安装到独立临时目录，验证安装后 CLI 与真实执行链路。**尚未发布到 npm 公共仓库。**
 
 运行示例后应输出两行：
 
@@ -34,7 +38,7 @@ Final task state: completed
 Final job state: completed
 ```
 
-CLI 入口为 `node bin/arl.mjs`，支持 `accept`、`submit`、`start`、`status`、`checkpoint`、`op-begin`、`op-confirm`、`op-abort`、`gate`、`complete`、`retry`、`recover` 等命令。详细参数及 JavaScript API 见 [英文 README](README.md)。
+新用户建议先看 [5 分钟入门指南](docs/QUICKSTART.md)，其中 PowerShell 和 Bash 版本会在 CI 实际执行。CLI 入口为 `node bin/arl.mjs`，支持 `accept`、`submit`、`start`、`status`、`checkpoint`、`op-begin`、`op-confirm`、`op-abort`、`gate`、`complete`、`retry`、`recover` 等命令。详细参数及 JavaScript API 见 [英文 README](README.md)。
 
 运行状态默认写入指定工作目录的 `.arl/`，自动化测试只使用独立临时目录。
 

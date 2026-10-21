@@ -24,3 +24,15 @@ jobs:
         run: npm test
       - name: Run independent example
         run: npm run example
+      - name: Demonstrate separate CLI caller handoff
+        run: npm run demo:handoff
+      - name: Install local tarball and exercise packaged CLI
+        run: npm run test:package
+      - name: Verify PowerShell documented quickstart
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./examples/quickstart.ps1
+      - name: Verify Bash documented quickstart
+        if: runner.os != 'Windows'
+        shell: bash
+        run: bash ./examples/quickstart.sh
