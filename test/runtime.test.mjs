@@ -237,6 +237,43 @@ test('a failed job with an uncertain operation retains resources until reconcili
   } finally {f.cleanup();}
 });
 
+test('a missing executable becomes a recorded job failure, never a false success', async () => {
+  const f = make();
+  try {
+    const taskId = f.rt.accept({key:'missing-executable',title:'Missing executable'}).task.id;
+    const jobId = f.rt.submit({
+      taskId, key:'not-found',
+      command:{exe:'arl-command-that-does-not-exist-7832',args:[]},
+      resources:['missing:resource']
+    }).job.id;
+    f.rt.start({jobId});
+    await wait(() => f.rt.status({jobId}).job.state === 'failed');
+    const job = f.rt.status({jobId}).job;
+    assert.match(job.blockReason, /ENOENT|not found/i);
+    assert.equal(job.gates[0].passed, false);
+    assert.equal(f.rt.status({taskId}).task.state, 'blocked');
+    assert.throws(() => f.rt.complete({jobId}), /JOB_NOT_COMPLETION_CANDIDATE/);
+  } finally {f.cleanup();}
+});
+
+test('timeout terminates the child and cannot satisfy completion gates', async () => {
+  const f = make();
+  try {
+    const taskId=f.rt.accept({key:'timeout-job',title:'Timed execution'}).task.id;
+    const jobId=f.rt.submit({
+      taskId, key:'slow',
+      command:command('setTimeout(() => console.log("should-not-finish"), 10000)'),
+      timeoutMs:500
+    }).job.id;
+    f.rt.start({jobId});
+    await wait(() => f.rt.status({jobId}).job.state === 'failed');
+    const job=f.rt.status({jobId}).job;
+    assert.equal(job.gates[0].passed, false);
+    assert.notEqual(job.attempts.at(-1).exitCode, 0);
+    assert.throws(() => f.rt.complete({jobId}), /JOB_NOT_COMPLETION_CANDIDATE/);
+  } finally {f.cleanup();}
+});
+
 test('process survives a CLI invocation and status can be read in a new process', async () => {
   const f = make();
   try {
