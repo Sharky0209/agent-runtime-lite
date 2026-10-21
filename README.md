@@ -1,0 +1,103 @@
+# Agent Runtime Lite
+
+**A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
+
+Version 0.1.0 · MIT licensed · Built for single-host, recoverable agent workflows.
+
+## Why this exists
+
+Agent conversations can end before the work does. A child process exiting successfully also does not prove that a report reached its destination. Agent Runtime Lite separates these concerns:
+
+- **Control task:** a durable user goal, which can contain multiple jobs.
+- **Runtime job:** a named OS command with its own execution lifecycle.
+- **Attempt:** an append-only record of one worker/child execution.
+- **Operation:** a potentially external effect, marked uncertain before dispatch and confirmed only after readback.
+- **Completion gate:** a named piece of evidence required before completion.
+- **Resource reservation:** prevents two jobs from using the same declared write target concurrently.
+
+This release is intentionally a **single-host local runtime**, not a distributed orchestration service.
+
+## Requirements
+
+Node.js 20 or later. No database server, browser, external service, or npm dependency.
+
+From this directory:
+
+```sh
+npm test
+npm run example
+```
+
+The CLI is `node bin/arl.mjs` (or `arl` after registering the package's bin). Runtime data is created beneath `.arl/` in the chosen `--root` directory.
+
+## CLI walkthrough
+
+PowerShell example (the CLI prints JSON containing the generated IDs):
+
+```powershell
+node bin/arl.mjs accept --root . --key demo-1 --title "Generate a report"
+node bin/arl.mjs submit --root . --task TASK_ID --key report --command '{"exe":"node","args":["-e","console.log(\"ready\")"]}' --gates '["report_readback"]'
+node bin/arl.mjs start --root . --job JOB_ID
+node bin/arl.mjs status --root . --job JOB_ID
+node bin/arl.mjs gate --root . --job JOB_ID --name report_readback --evidence "Reviewed report output"
+node bin/arl.mjs complete --root . --job JOB_ID
+node bin/arl.mjs status --root . --task TASK_ID
+```
+
+If your shell quoting differs, use the JavaScript API below or the working `npm run example` reference. A running job creates a detached worker and records a log in `.arl/logs/`. Successful OS exit moves the job into `completion_candidate`; it does **not** complete automatically.
+
+## JavaScript API
+
+```js
+import {Runtime} from './src/runtime.mjs';
+const r = new Runtime('./my-workspace');
+const {task} = r.accept({key: 'weekly-report', title: 'Weekly report'});
+const {job} = r.submit({
+  taskId: task.id,
+  key: 'generate',
+  command: {exe: process.execPath, args: ['-e', 'console.log("ok")']},
+  resources: ['report:weekly'],
+  gates: ['reviewed_report'],
+});
+r.start({jobId: job.id});
+// Later, even in a different process:
+// r.status({jobId: job.id});
+// r.passGate({jobId: job.id, name: 'reviewed_report', evidence: 'Report inspected'});
+// r.complete({jobId: job.id});
+```
+
+Run `npm run example` to see the full flow with polling and a verified completion.
+
+## Dealing with external writes
+
+Before attempting an external action during an active job, call `beginOperation({jobId,key})` with a stable business-operation key. If the call times out, the operation stays **uncertain**: never treat the absence of a success response as proof that the action did not happen.
+
+After checking the external destination, use:
+
+```js
+r.settleOperation({jobId, key: 'publish-1', outcome: 'confirmed', evidence: 'Target readback shows the change'});
+// or outcome: 'aborted', if you established that dispatch never occurred
+```
+
+The library does not send external requests itself and cannot certify evidence automatically. You provide the external implementation and truthful readback. An uncertain operation prevents final completion and prevents an unsafe retry.
+
+## Recovery and retry
+
+- `recover()` checks jobs marked launching/running and their actual processes.
+- Dead workers are **blocked by default**, leaving their attempt history intact.
+- `resume: 'auto_safe'` is permitted only with `readOnly: true` and a finite `maxRestarts`. This policy is **opt-in** for commands safe to rerun.
+- Jobs with a still-live child do not restart.
+- `retry({jobId})` is an explicit operator decision after verifying that retrying will not duplicate an effect.
+- Resource reservations remain held while a job is awaiting gate confirmation. They are released when completion is confirmed or a failed job has no uncertain effects.
+
+## Scope and limits
+
+Designed for a **single Windows/macOS/Linux host using a local filesystem**. It stores a single atomic JSON snapshot protected by a short-lived process lock, so it suits small and medium personal agent workloads rather than a large distributed job queue.
+
+Currently not included: automatic verification of arbitrary external side effects, distributed leases, a scheduler, GUI/browser automation, remote worker management, production SaaS adapters, or a package release. This project does not bundle or reuse any third-party proprietary runtime.
+
+## Development and publication
+
+See [architecture and design boundaries](docs/ARCHITECTURE.md). The runtime is in `src/`, the CLI in `bin/`, and the offline/integration tests in `test/`. Contributions, bug reports, and reproducible use cases are welcome.
+
+Distributed coordination, persistent service management, and automated verification of remote side effects are outside the current 0.1.0 scope.
