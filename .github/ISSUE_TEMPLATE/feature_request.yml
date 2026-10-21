@@ -1,0 +1,20 @@
+name: Feature request
+description: Propose a feature consistent with the single-host task runtime scope
+title: "feature: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What real workflow is blocked?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and scope considerations
