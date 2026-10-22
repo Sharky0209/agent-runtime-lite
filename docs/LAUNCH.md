@@ -26,6 +26,8 @@ Record the terminal showing these truthful milestones:
 
 A caller/session handoff is **not** a demonstration of automatic worker-crash or machine-reboot recovery.
 
+For a tangible deliverable beyond the terminal-output demo, run `node examples/report-file-handoff.mjs`. It generates a real JSON report, rejects completion before file readback, then validates the file before passing its completion gate.
+
 ## Hacker News — Show HN
 
 Title: `Show HN: Agent Runtime Lite – local durable jobs with completion gates`

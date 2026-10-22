@@ -29,6 +29,8 @@ Worker attempts: 1
 The original CLI process did not need to remain open.
 ```
 
+**Want a file-based example?** Run `node examples/report-file-handoff.mjs` to generate a real `report.json` in a detached subprocess, read the file from a fresh CLI caller, reject completion until its contents are checked, and then complete the task. Both demos need only Node.js 20+.
+
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
 Version 0.1.2 · MIT licensed · Built for single-host, recoverable agent workflows.

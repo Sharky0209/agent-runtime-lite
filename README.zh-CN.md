@@ -26,6 +26,8 @@ Worker attempts: 1
 The original CLI process did not need to remain open.
 ```
 
+**真实文件示例：** 执行 `node examples/report-file-handoff.mjs`，后台进程会生成 `report.json`，后续独立 CLI 进程读回文件并校验汇总值，通过后才允许完成任务。只需要 Node.js 20+，不依赖 npm Registry 服务。
+
 **版本：v0.1.2，MIT 许可证，面向单机任务运行场景。**
 
 ## 不克隆源码，直接安装体验
