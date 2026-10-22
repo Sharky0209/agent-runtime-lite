@@ -5,6 +5,30 @@
 
 [5-minute quickstart](docs/QUICKSTART.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Changelog](CHANGELOG.md)
 
+**Your agent's CLI session ended. Did its task actually finish?**
+
+Agent Runtime Lite keeps a local task record across separate CLI invocations, launches a detached child process, and distinguishes a successful command exit from a **verified** result. You inspect the real output and explicitly pass a completion gate before the task can be marked done.
+
+It is a dependency-free Node.js runner for single-host workflows—not an AI model host, a distributed queue, or automatic proof of external business outcomes.
+
+### See the handoff in about a minute
+
+```sh
+git clone https://github.com/Sharky0209/agent-runtime-lite.git
+cd agent-runtime-lite
+npm run demo:handoff
+```
+
+The demo starts a real detached child, ends the first CLI invocation, retrieves its state through fresh CLI processes, rejects premature completion, checks the actual log, and only then completes. It demonstrates **caller handoff**, not automatic recovery from an arbitrary worker crash.
+
+Expected final lines:
+
+```text
+Final task state: completed
+Worker attempts: 1
+The original CLI process did not need to remain open.
+```
+
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
 Version 0.1.2 · MIT licensed · Built for single-host, recoverable agent workflows.

@@ -4,7 +4,27 @@
 
 [5 分钟入门](docs/QUICKSTART.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [更新记录](CHANGELOG.md)
 
-一个可本地运行、零第三方 npm 依赖的 **Agent 持久任务运行框架**。目标是让 AI Agent 的工作不会随着一次对话或 CLI 调用结束而失去状态，并把“命令执行成功”和“业务真正完成”分开。
+**Agent 的 CLI 会话结束了，任务真的完成了吗？**
+
+Agent Runtime Lite 让任务状态能被后续独立 CLI 进程接手：启动真实后台子进程、保留任务记录，命令退出成功后先进入待验收状态，核实输出并提交验收证据后才完成任务。它是零第三方 npm 依赖的**单机任务运行框架**，不是模型服务或分布式任务队列，也不会自动证明第三方业务结果。
+
+### 一分钟看懂实际效果
+
+```sh
+git clone https://github.com/Sharky0209/agent-runtime-lite.git
+cd agent-runtime-lite
+npm run demo:handoff
+```
+
+示例会启动真实后台子进程，让第一次 CLI 调用先退出，由后续独立进程读取状态；未验收不能完成，检查真实日志后才能通过验收。它展示的是**调用方跨进程接力**，不代表任意异常退出的 Worker 都能自动恢复。
+
+预期末尾输出：
+
+```text
+Final task state: completed
+Worker attempts: 1
+The original CLI process did not need to remain open.
+```
 
 **版本：v0.1.2，MIT 许可证，面向单机任务运行场景。**
 
