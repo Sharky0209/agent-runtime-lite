@@ -144,7 +144,7 @@ The library does not send external requests itself and cannot certify evidence a
 
 Designed for a **single Windows/macOS/Linux host using a local filesystem**. It stores a single atomic JSON snapshot protected by a short-lived process lock, so it suits small and medium personal agent workloads rather than a large distributed job queue.
 
-Currently not included: automatic verification of arbitrary external side effects, distributed leases, a scheduler, GUI/browser automation, remote worker management, production SaaS adapters, or a package release. This project does not bundle or reuse any third-party proprietary runtime.
+Currently not included: automatic verification of arbitrary external side effects, distributed leases, a scheduler, GUI/browser automation, remote worker management, production SaaS adapters, or an npm registry release. This project does not bundle or reuse any third-party proprietary runtime.
 
 ## Development and publication
 

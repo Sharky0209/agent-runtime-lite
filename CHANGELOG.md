@@ -4,6 +4,11 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Treat a reached command deadline as a failure even if the child handles the termination signal and exits successfully; escalate termination if a POSIX child ignores the signal.
+- Retain reserved resources when a recovered orphan child remains alive, even after an external operation is reconciled.
+- Add focused regressions for deadline handling, resource ownership, and termination behavior.
+- Restrict the one-time npm publish workflow to the v0.1.2 release tag, test the checked-out package, and stop on registry errors other than a missing version.
+
 ## [0.1.2] - 2026-10-21
 
 - Add tested offline tarball installation and separate consumer CLI smoke test.

@@ -48,11 +48,20 @@ export async function executeWorker(root, jobId, attemptId) {
     } catch (error) { console.error('HEARTBEAT:', error.message); }
   }, 2000);
   ticker.unref();
-  const killer = spec.timeoutMs ? setTimeout(() => child.kill(), spec.timeoutMs) : null;
+  let timedOut = false;
+  let forceKill = null;
+  const killer = spec.timeoutMs ? setTimeout(() => {
+    timedOut = true;
+    child.kill();
+    // A child may ignore SIGTERM on POSIX; do not wait forever for close.
+    forceKill = setTimeout(() => child.kill('SIGKILL'), 2000);
+    forceKill.unref();
+  }, spec.timeoutMs) : null;
   const exit = await new Promise(resolve => {
     child.once('close', (code, signal) => resolve({code, signal}));
   });
   if (killer) clearTimeout(killer);
+  if (forceKill) clearTimeout(forceKill);
   clearInterval(ticker);
   fs.closeSync(fd);
   store.update(state => {
@@ -64,15 +73,16 @@ export async function executeWorker(root, jobId, attemptId) {
     attempt.signal = exit.signal || null;
     if (job.state !== 'running') return;
     job.updatedAt = iso();
-    if (exit.code === 0 && !spawnError) {
+    if (exit.code === 0 && !spawnError && !timedOut) {
       job.state = 'completion_candidate';
       const gate = job.gates.find(g => g.name === 'process_exit_zero');
       gate.passed = true;
       gate.evidence = 'child process exited with code 0';
     } else {
       job.state = 'failed';
-      job.blockReason = spawnError?.message || 'PROCESS_EXIT:' + String(exit.code) +
-        (exit.signal ? ':' + exit.signal : '');
+      job.blockReason = timedOut ? 'PROCESS_TIMEOUT:' + spec.timeoutMs :
+        (spawnError?.message || 'PROCESS_EXIT:' + String(exit.code) +
+          (exit.signal ? ':' + exit.signal : ''));
       if (!job.operations.some(op => op.state === 'uncertain')) {
         for (const resource of job.resources) {
           if (state.resources[resource] === jobId) delete state.resources[resource];

@@ -11,14 +11,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: v0.1.2
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-      - name: Verify package identity
+      - name: Verify tagged package and registry status
+        shell: bash
         run: |
           node -e "const p=require('./package.json'); if(p.name!=='agent-runtime-lite'||p.version!=='0.1.2'){console.error('unexpected package',p.name,p.version); process.exit(1)} console.log(p.name+'@'+p.version)"
-          npm view agent-runtime-lite@0.1.2 version && { echo 'ALREADY PUBLISHED - aborting'; exit 1; } || echo 'not published yet, proceeding'
+          if lookup="$(npm view agent-runtime-lite@0.1.2 version 2>&1)"; then
+            echo "ALREADY PUBLISHED - aborting"
+            exit 1
+          fi
+          if [[ "$lookup" != *"E404"* ]]; then
+            echo "Registry lookup failed for a reason other than package absence:"
+            echo "$lookup"
+            exit 1
+          fi
+          echo "Package version not published yet"
+      - name: Test tagged source
+        run: npm test
+      - name: Test packaged CLI
+        run: npm run test:package
       - name: Publish
         run: npm publish --access public
         env:
