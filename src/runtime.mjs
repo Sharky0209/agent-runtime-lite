@@ -8,6 +8,12 @@ const fail = (message) => { throw new Error(message); };
 const id = (prefix) => prefix + '-' + randomUUID();
 const copy = (value) => JSON.parse(JSON.stringify(value));
 const unknownEffects = (job) => job.operations.some(op => op.state === 'uncertain');
+// A live PID alone cannot identify a particular worker after PID reuse.
+// Heartbeats are advisory: stale identity always blocks instead of auto-retrying.
+const workerHeartbeatStale = (attempt) => {
+  const last = Date.parse(attempt?.heartbeatAt || attempt?.startedAt || '');
+  return !Number.isFinite(last) || Date.now() - last > 30_000;
+};
 const childDispatchUncertain = (job) => {
   const attempt = job.attempts.at(-1);
   return !!(attempt?.spawnIntentAt && !attempt.childPid && !attempt.finishedAt);
@@ -177,7 +183,8 @@ export class Runtime {
       const job = checkJob(state, jobId);
       if (['launching','running'].includes(job.state)) {
         const attempt = job.attempts.at(-1);
-        if (processAlive(attempt?.workerPid) || processAlive(attempt?.launcherPid) ||
+        if (((processAlive(attempt?.workerPid) || processAlive(attempt?.launcherPid)) &&
+          !workerHeartbeatStale(attempt)) ||
           (job.state === 'launching' && Date.now() - Date.parse(attempt?.startedAt || 0) < 5000)) {
           return {alreadyRunning: true, job: copy(job)};
         }
@@ -241,8 +248,11 @@ export class Runtime {
       for (const job of Object.values(state.jobs)) {
         if (!['launching','running'].includes(job.state)) continue;
         const attempt = job.attempts.at(-1);
-        if (processAlive(attempt?.workerPid) || processAlive(attempt?.launcherPid)) continue;
-        if (processAlive(attempt?.childPid)) {
+        const workerPidAlive = processAlive(attempt?.workerPid) || processAlive(attempt?.launcherPid);
+        if (workerPidAlive && !workerHeartbeatStale(attempt)) continue;
+        if (workerPidAlive) {
+          job.state = 'blocked'; job.blockReason = 'WORKER_HEARTBEAT_STALE';
+        } else if (processAlive(attempt?.childPid)) {
           job.state = 'blocked'; job.blockReason = 'CHILD_STILL_ALIVE';
         } else if (childDispatchUncertain(job)) {
           // The child may have started before its PID could be persisted.

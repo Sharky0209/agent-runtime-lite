@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {spawn, spawnSync} from 'node:child_process';
 import {Runtime} from '../src/runtime.mjs';
+import {processAlive} from '../src/state.mjs';
 
 const make = () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arl-test-'));
@@ -224,6 +225,72 @@ test('recovery blocks uncertain lost workers; safe read-only jobs can resume', a
     assert.equal(f.rt.status({jobId:safe}).job.attempts.length,2);
     f.rt.complete({jobId:safe});
   } finally {f.cleanup();}
+});
+
+test('a live unrelated PID cannot mask a long-dead worker heartbeat', () => {
+  const f = make();
+  try {
+    const taskId = f.rt.accept({key:'pid-reuse',title:'Stale identity'}).task.id;
+    const holder = f.rt.submit({
+      taskId,key:'holder',command:command(),readOnly:true,resume:'auto_safe',maxRestarts:2,
+      resources:['shared:stale']
+    }).job.id;
+    const contender = f.rt.submit({taskId,key:'contender',command:command(),resources:['shared:stale']}).job.id;
+    f.rt.store.update(state => {
+      const job = state.jobs[holder];
+      job.state = 'running';
+      job.attempts = [{
+        id:'stale-worker',workerPid:process.pid,launcherPid:process.pid,childPid:99999999,
+        startedAt:'2001-01-01T00:00:00.000Z',heartbeatAt:'2001-01-01T00:00:00.000Z'
+      }];
+      state.resources['shared:stale'] = holder;
+    });
+    assert.throws(() => f.rt.start({jobId:holder}), /RECOVER_STALE_ATTEMPT_FIRST/);
+    const result = f.rt.recover();
+    assert.equal(result.restarted.length, 0);
+    assert.equal(result.changed[0].reason, 'WORKER_HEARTBEAT_STALE');
+    assert.equal(f.rt.status({jobId:holder}).job.state, 'blocked');
+    assert.throws(() => f.rt.start({jobId:contender}), /RESOURCE_BUSY/);
+    assert.throws(() => f.rt.retry({jobId:holder}), /PROCESS_STILL_ALIVE/);
+  } finally {f.cleanup();}
+});
+
+test('killing a real worker with an uncertain operation never auto-replays', async () => {
+  const f = make();
+  let workerPid = null;
+  let childPid = null;
+  try {
+    const taskId = f.rt.accept({key:'kill-worker',title:'Real worker death'}).task.id;
+    const holder = f.rt.submit({
+      taskId,key:'holder',command:command('setTimeout(() => {}, 12000)'),
+      resources:['shared:orphan']
+    }).job.id;
+    const contender = f.rt.submit({taskId,key:'contender',command:command(),resources:['shared:orphan']}).job.id;
+    f.rt.start({jobId:holder});
+    const running = await wait(() => {
+      const job = f.rt.status({jobId:holder}).job;
+      const attempt = job.attempts.at(-1);
+      return job.state === 'running' && attempt?.spawnIntentAt && attempt?.childPid ? attempt : null;
+    });
+    workerPid = running.workerPid;
+    childPid = running.childPid;
+    assert.ok(workerPid && childPid);
+    f.rt.beginOperation({jobId:holder,key:'external-write'});
+    process.kill(workerPid);
+    await wait(() => !processAlive(workerPid), 8000);
+    const result = f.rt.recover();
+    assert.equal(result.restarted.length, 0);
+    assert.equal(result.changed[0].state, 'blocked');
+    assert.ok(['CHILD_STILL_ALIVE', 'OPERATION_RECONCILIATION_REQUIRED'].includes(result.changed[0].reason));
+    assert.equal(f.rt.status({jobId:holder}).job.attempts.length, 1);
+    assert.equal(f.rt.status({jobId:holder}).job.operations[0].state, 'uncertain');
+    assert.throws(() => f.rt.start({jobId:contender}), /RESOURCE_BUSY/);
+    assert.throws(() => f.rt.retry({jobId:holder}), /PROCESS_STILL_ALIVE|OPERATION_RECONCILIATION_REQUIRED/);
+  } finally {
+    if (childPid && processAlive(childPid)) { try { process.kill(childPid); } catch {} }
+    if (workerPid && processAlive(workerPid)) { try { process.kill(workerPid); } catch {} }
+    f.cleanup();
+  }
 });
 
 test('concurrent CLI invocations share one task and one worker attempt', async () => {
