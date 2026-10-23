@@ -237,6 +237,26 @@ test('a failed job with an uncertain operation retains resources until reconcili
   } finally {f.cleanup();}
 });
 
+test('reconciled operations cannot release resources while a recovered child is alive', () => {
+  const f = make();
+  try {
+    const taskId = f.rt.accept({key:'child-live',title:'Child still alive'}).task.id;
+    const holder = f.rt.submit({taskId,key:'holder',command:command(),resources:['shared:held']}).job.id;
+    const follower = f.rt.submit({taskId,key:'follower',command:command(),resources:['shared:held']}).job.id;
+    f.rt.store.update(state => {
+      const job = state.jobs[holder];
+      job.state = 'running';
+      job.attempts = [{id:'lost-worker',workerPid:99999999,launcherPid:99999999,childPid:process.pid}];
+      job.operations = [{key:'external',state:'uncertain',at:new Date().toISOString(),evidence:null}];
+      state.resources['shared:held'] = holder;
+    });
+    assert.equal(f.rt.recover().changed[0].reason, 'CHILD_STILL_ALIVE');
+    f.rt.settleOperation({jobId:holder,key:'external',outcome:'confirmed',evidence:'external destination checked'});
+    assert.throws(() => f.rt.start({jobId:follower}), /RESOURCE_BUSY/);
+    assert.equal(f.rt.status({jobId:holder}).job.state, 'blocked');
+  } finally {f.cleanup();}
+});
+
 test('a missing executable becomes a recorded job failure, never a false success', async () => {
   const f = make();
   try {
@@ -269,8 +289,45 @@ test('timeout terminates the child and cannot satisfy completion gates', async (
     await wait(() => f.rt.status({jobId}).job.state === 'failed');
     const job=f.rt.status({jobId}).job;
     assert.equal(job.gates[0].passed, false);
+    assert.match(job.blockReason, /PROCESS_TIMEOUT/);
     assert.notEqual(job.attempts.at(-1).exitCode, 0);
     assert.throws(() => f.rt.complete({jobId}), /JOB_NOT_COMPLETION_CANDIDATE/);
+  } finally {f.cleanup();}
+});
+
+test('a child exiting zero after SIGTERM still fails its deadline', {skip: process.platform === 'win32'}, async () => {
+  const f = make();
+  try {
+    const taskId = f.rt.accept({key:'deadline-catch',title:'Trap SIGTERM'}).task.id;
+    const jobId = f.rt.submit({
+      taskId, key:'trap',
+      command:command("process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000)"),
+      timeoutMs:1200
+    }).job.id;
+    f.rt.start({jobId});
+    await wait(() => ['failed','completion_candidate'].includes(f.rt.status({jobId}).job.state));
+    const job = f.rt.status({jobId}).job;
+    assert.equal(job.attempts.at(-1).exitCode, 0, 'child trapped SIGTERM and exited zero');
+    assert.equal(job.state, 'failed');
+    assert.match(job.blockReason, /PROCESS_TIMEOUT/);
+    assert.equal(job.gates[0].passed, false);
+  } finally {f.cleanup();}
+});
+
+test('a child ignoring SIGTERM is force-stopped after its deadline', {skip: process.platform === 'win32'}, async () => {
+  const f = make();
+  try {
+    const taskId = f.rt.accept({key:'deadline-ignore',title:'Ignore SIGTERM'}).task.id;
+    const jobId = f.rt.submit({
+      taskId, key:'ignore',
+      command:command("process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"),
+      timeoutMs:1200
+    }).job.id;
+    f.rt.start({jobId});
+    await wait(() => f.rt.status({jobId}).job.state === 'failed', 10000);
+    const job = f.rt.status({jobId}).job;
+    assert.equal(job.blockReason, 'PROCESS_TIMEOUT:1200');
+    assert.equal(job.gates[0].passed, false);
   } finally {f.cleanup();}
 });
 

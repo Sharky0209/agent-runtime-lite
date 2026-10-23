@@ -25,7 +25,9 @@ The state is persisted as an atomic JSON snapshot and synchronized with a local 
 
 ## Recovery behavior
 
-Running jobs are only considered lost when the recorded worker is gone. If a child is still alive, recovery reports a blocker rather than launching a second command. Automatic recovery is opt-in and limited to declared read-only jobs. Other jobs require explicit review and `retry()`.
+Running jobs are only considered lost when the recorded worker is gone. If a child is still alive, recovery reports a blocker rather than launching a second command. Its declared resource reservations remain held, including after settling a previously uncertain operation. Once the child has actually stopped, the operator can inspect the outcome and explicitly call `retry()`; this releases the old reservations for a new attempt. Automatic recovery is opt-in and limited to declared read-only jobs. Other jobs require explicit review and `retry()`.
+
+A command that reaches its configured `timeoutMs` fails even if the child subsequently exits with code zero. On POSIX hosts, the worker first signals termination and then forcibly terminates an unresponsive child after a short grace period. Timeouts do not satisfy completion gates.
 
 ## External effects
 
@@ -38,6 +40,7 @@ The library cannot know what an application actually wrote. The caller records t
 - No built-in remote application integrations.
 - Evidence is supplied by a caller; the library does not inspect arbitrary systems to prove claims.
 - No guarantee that an arbitrary command is safe to rerun, even if a user marks it read-only.
+- Child-process supervision is per direct child, not a portable process-tree termination service; applications launching descendants must manage their own cleanup.
 
 ## Tests
 

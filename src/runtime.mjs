@@ -134,7 +134,8 @@ export class Runtime {
       op.evidence = String(evidence);
       op.settledAt ||= iso();
       touch(job);
-      if (['blocked','failed'].includes(job.state) && !unknownEffects(job)) releaseResources(state, job);
+      if (['blocked','failed'].includes(job.state) && !unknownEffects(job) &&
+        !processAlive(job.attempts.at(-1)?.childPid)) releaseResources(state, job);
       return copy(op);
     });
   }
