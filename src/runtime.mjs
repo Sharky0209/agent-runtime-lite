@@ -8,6 +8,10 @@ const fail = (message) => { throw new Error(message); };
 const id = (prefix) => prefix + '-' + randomUUID();
 const copy = (value) => JSON.parse(JSON.stringify(value));
 const unknownEffects = (job) => job.operations.some(op => op.state === 'uncertain');
+const childDispatchUncertain = (job) => {
+  const attempt = job.attempts.at(-1);
+  return !!(attempt?.spawnIntentAt && !attempt.childPid && !attempt.finishedAt);
+};
 const releaseResources = (state, job) => {
   for (const resource of job.resources) {
     if (state.resources[resource] === job.id) delete state.resources[resource];
@@ -135,7 +139,8 @@ export class Runtime {
       op.settledAt ||= iso();
       touch(job);
       if (['blocked','failed'].includes(job.state) && !unknownEffects(job) &&
-        !processAlive(job.attempts.at(-1)?.childPid)) releaseResources(state, job);
+        !processAlive(job.attempts.at(-1)?.childPid) &&
+        !childDispatchUncertain(job)) releaseResources(state, job);
       return copy(op);
     });
   }
@@ -239,6 +244,9 @@ export class Runtime {
         if (processAlive(attempt?.workerPid) || processAlive(attempt?.launcherPid)) continue;
         if (processAlive(attempt?.childPid)) {
           job.state = 'blocked'; job.blockReason = 'CHILD_STILL_ALIVE';
+        } else if (childDispatchUncertain(job)) {
+          // The child may have started before its PID could be persisted.
+          job.state = 'blocked'; job.blockReason = 'CHILD_DISPATCH_UNCERTAIN';
         } else if (job.resume === 'auto_safe' && job.readOnly &&
           !unknownEffects(job) && job.attempts.length <= job.maxRestarts) {
           job.state = 'queued'; job.blockReason = null;

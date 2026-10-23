@@ -23,6 +23,15 @@ export async function executeWorker(root, jobId, attemptId) {
   fs.mkdirSync(logs, {recursive: true});
   const fd = fs.openSync(path.join(logs, jobId + '-' + attemptId + '.log'), 'a');
   const command = spec.command;
+  // Persist dispatch intent before the spawn/PID-persist crash window.
+  store.update(state => {
+    const job = state.jobs[jobId];
+    const attempt = job?.attempts.at(-1);
+    if (job?.state !== 'running' || attempt?.id !== attemptId) {
+      throw Error('WORKER_ATTEMPT_NOT_CURRENT');
+    }
+    attempt.spawnIntentAt = iso();
+  });
   const child = spawn(command.exe, command.args, {
     cwd: command.cwd || root,
     stdio: ['ignore', fd, fd],
