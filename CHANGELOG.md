@@ -4,6 +4,9 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Persist child dispatch intent before process spawn and block uncertain crash-window recovery instead of potentially starting a duplicate child.
+- Retain resource ownership until an operator reconciles the unknown dispatch and explicitly retries; add focused regression coverage.
+
 - Treat a reached command deadline as a failure even if the child handles the termination signal and exits successfully; escalate termination if a POSIX child ignores the signal.
 - Retain reserved resources when a recovered orphan child remains alive, even after an external operation is reconciled.
 - Add focused regressions for deadline handling, resource ownership, and termination behavior.

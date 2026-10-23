@@ -152,6 +152,57 @@ test('nonzero child exit records failure and allows an explicit retry', async ()
   } finally {f.cleanup();}
 });
 
+test('uncertain child dispatch does not auto-restart or release its resource', () => {
+  const f = make();
+  try {
+    const taskId = f.rt.accept({key:'spawn-window',title:'Spawn window'}).task.id;
+    const uncertain = f.rt.submit({
+      taskId,key:'uncertain',command:command(),
+      resources:['shared:window'],readOnly:true,resume:'auto_safe',maxRestarts:1
+    }).job.id;
+    const follower = f.rt.submit({taskId,key:'follower',command:command(),resources:['shared:window']}).job.id;
+    f.rt.store.update(state => {
+      const job = state.jobs[uncertain];
+      job.state = 'running';
+      job.attempts = [{
+        id:'lost-during-dispatch',workerPid:99999999,launcherPid:99999999,
+        childPid:null,spawnIntentAt:new Date().toISOString()
+      }];
+      state.resources['shared:window'] = uncertain;
+    });
+    const result = f.rt.recover();
+    assert.equal(result.restarted.length, 0);
+    const job = f.rt.status({jobId:uncertain}).job;
+    assert.equal(job.state, 'blocked');
+    assert.equal(job.blockReason, 'CHILD_DISPATCH_UNCERTAIN');
+    assert.equal(job.attempts.length, 1);
+    assert.throws(() => f.rt.start({jobId:follower}), /RESOURCE_BUSY/);
+  } finally {f.cleanup();}
+});
+
+test('operation reconciliation keeps a reservation held by an unknown child', () => {
+  const f = make();
+  try {
+    const taskId = f.rt.accept({key:'spawn-op',title:'Spawn operation'}).task.id;
+    const uncertain = f.rt.submit({taskId,key:'uncertain',command:command(),resources:['shared:window']}).job.id;
+    const follower = f.rt.submit({taskId,key:'follower',command:command(),resources:['shared:window']}).job.id;
+    f.rt.store.update(state => {
+      const job = state.jobs[uncertain];
+      job.state = 'running';
+      job.attempts = [{
+        id:'unknown-child',workerPid:99999999,launcherPid:99999999,
+        childPid:null,spawnIntentAt:new Date().toISOString()
+      }];
+      job.operations = [{key:'external',state:'uncertain',at:new Date().toISOString(),evidence:null}];
+      state.resources['shared:window'] = uncertain;
+    });
+    f.rt.recover();
+    f.rt.settleOperation({jobId:uncertain,key:'external',outcome:'confirmed',evidence:'remote result checked'});
+    assert.equal(f.rt.status({jobId:uncertain}).job.blockReason, 'CHILD_DISPATCH_UNCERTAIN');
+    assert.throws(() => f.rt.start({jobId:follower}), /RESOURCE_BUSY/);
+  } finally {f.cleanup();}
+});
+
 test('recovery blocks uncertain lost workers; safe read-only jobs can resume', async () => {
   const f = make();
   try {

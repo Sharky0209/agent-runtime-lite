@@ -25,7 +25,9 @@ The state is persisted as an atomic JSON snapshot and synchronized with a local 
 
 ## Recovery behavior
 
-Running jobs are only considered lost when the recorded worker is gone. If a child is still alive, recovery reports a blocker rather than launching a second command. Its declared resource reservations remain held, including after settling a previously uncertain operation. Once the child has actually stopped, the operator can inspect the outcome and explicitly call `retry()`; this releases the old reservations for a new attempt. Automatic recovery is opt-in and limited to declared read-only jobs. Other jobs require explicit review and `retry()`.
+Running jobs are only considered lost when the recorded worker is gone. If a child is still alive, recovery reports a blocker rather than launching a second command. Before spawning a child, the worker records a durable `spawnIntentAt` marker. If it crashes before persisting the child's PID, recovery blocks as `CHILD_DISPATCH_UNCERTAIN` rather than guessing that the child never started. The resource reservation remains held even if an uncertain external operation is later reconciled. An operator must inspect the outcome and make an explicit `retry()` decision after verifying it is safe to rerun; that transition releases the old reservations. Automatic recovery is opt-in and limited to declared read-only jobs with no outstanding dispatch uncertainty. Other jobs require explicit review and `retry()`.
+
+This marker closes the known spawn-before-PID-persist recovery gap conservatively; it cannot prove whether the child actually launched, nor does it protect against PID reuse on its own.
 
 A command that reaches its configured `timeoutMs` fails even if the child subsequently exits with code zero. On POSIX hosts, the worker first signals termination and then forcibly terminates an unresponsive child after a short grace period. Timeouts do not satisfy completion gates.
 
