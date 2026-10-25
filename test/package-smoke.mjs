@@ -61,8 +61,10 @@ try{
     exe:process.execPath,args:['-e','console.log("ISOLATED_PACKAGE_OUTPUT")']
   }));
   const submitted=JSON.parse(cli(bin,['submit','--root',runtimeRoot,'--task',accepted.task.id,
-    '--key','run','--command-file',commandFile,'--gate','readback']));
+    '--key','run','--command-file',commandFile]));
   const jobId=submitted.job.id;
+  assert.equal(submitted.job.completionMode,'attested');
+  assert.ok(submitted.job.gates.some(g=>g.name==='caller_attestation'&&!g.passed));
   const beforeStart=JSON.parse(cli(bin,['status','--root',runtimeRoot,'--job',jobId]));
   assert.equal(beforeStart.job.state,'queued');
   JSON.parse(cli(bin,['start','--root',runtimeRoot,'--job',jobId]));
@@ -82,10 +84,11 @@ try{
   const attempt=candidate.attempts.at(-1);
   const log=fs.readFileSync(path.join(runtimeRoot,'.arl','logs',jobId+'-'+attempt.id+'.log'),'utf8');
   assert.match(log,/ISOLATED_PACKAGE_OUTPUT/);
-  JSON.parse(cli(bin,['gate','--root',runtimeRoot,'--job',jobId,'--name','readback',
-    '--evidence','Reviewed actual detached child output']));
+  JSON.parse(cli(bin,['gate','--root',runtimeRoot,'--job',jobId,'--name','caller_attestation',
+    '--evidence','Independent installed-package CLI caller inspected real output']));
   const completed=JSON.parse(cli(bin,['complete','--root',runtimeRoot,'--job',jobId]));
   assert.equal(completed.job.state,'completed');
+  assert.equal(completed.job.completionBasis,'caller_attested');
   const status=JSON.parse(cli(bin,['status','--root',runtimeRoot,'--task',accepted.task.id]));
   assert.equal(status.task.state,'completed');
   assert.equal(status.jobs[0].attempts.length,1);

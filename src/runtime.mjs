@@ -33,6 +33,14 @@ const commandShape = (command) => {
 const checkJob = (state, jobId) => state.jobs[jobId] || fail('JOB_NOT_FOUND');
 const checkTask = (state, taskId) => state.tasks[taskId] || fail('TASK_NOT_FOUND');
 const touch = (row) => { row.updatedAt = iso(); return row; };
+// v0.1.x jobs have no completionMode. Never silently retrofit their gates:
+// preserve their stored contract, but label the actual basis on completion.
+const completionBasis = (job) => {
+  if (job.completionMode === 'attested') return 'caller_attested';
+  if (job.completionMode === 'exit_only') return 'process_exit_only';
+  return job.gates.some(g => g.name !== 'process_exit_zero') ?
+    'legacy_configured_gates' : 'legacy_process_exit_only';
+};
 const safeBlockCode = (reason) => {
   const code = String(reason || '').split(':', 1)[0];
   return /^(CHILD_DISPATCH_UNCERTAIN|CHILD_STILL_ALIVE|WORKER_HEARTBEAT_STALE|WORKER_LOST|OPERATION_RECONCILIATION_REQUIRED|PROCESS_TIMEOUT|PROCESS_EXIT|WORKER_LAUNCH_FAILED)$/.test(code) ? code : 'OTHER';
@@ -68,17 +76,20 @@ export class Runtime {
     });
   }
   submit({taskId, key, command, required = true, gates = [], resources = [],
-    resume = 'manual', readOnly = false, maxRestarts = 0, timeoutMs = 0}) {
+    resume = 'manual', readOnly = false, maxRestarts = 0, timeoutMs = 0,
+    completionMode = 'attested'}) {
     if (!key) fail('JOB_KEY_REQUIRED');
     const normalized = commandShape(command);
     if (!['manual', 'auto_safe'].includes(resume)) fail('RESUME_POLICY_INVALID');
+    if (!['attested', 'exit_only'].includes(completionMode)) fail('COMPLETION_MODE_INVALID');
     if (resume === 'auto_safe' && !readOnly) fail('AUTO_RECOVERY_REQUIRES_READ_ONLY');
     if (!Array.isArray(resources) || !resources.every(v => typeof v === 'string' && v.trim())) fail('RESOURCES_INVALID');
-    if (!Array.isArray(gates) || !gates.every(v => typeof v === 'string' && v.trim() && v !== 'process_exit_zero')) fail('GATES_INVALID');
+    if (!Array.isArray(gates) || !gates.every(v => typeof v === 'string' && v.trim() && !['process_exit_zero','caller_attestation'].includes(v))) fail('GATES_INVALID');
     if (new Set(gates).size !== gates.length) fail('DUPLICATE_GATE');
+    if (completionMode === 'exit_only' && gates.length) fail('EXIT_ONLY_DISALLOWS_CUSTOM_GATES');
     if (!Number.isInteger(maxRestarts) || maxRestarts < 0 || !Number.isInteger(timeoutMs) || timeoutMs < 0) fail('JOB_LIMIT_INVALID');
     const immutable = {command: normalized, required: !!required, readOnly: !!readOnly,
-      resume, maxRestarts, timeoutMs, resources: [...new Set(resources)], gates};
+      resume, maxRestarts, timeoutMs, resources: [...new Set(resources)], gates, completionMode};
     return this.store.update(state => {
       checkTask(state, taskId);
       const lookup = JSON.stringify([taskId,key]);
@@ -87,15 +98,18 @@ export class Runtime {
         const previousImmutable = {command: previous.command, required: previous.required,
           readOnly: previous.readOnly, resume: previous.resume, maxRestarts: previous.maxRestarts,
           timeoutMs: previous.timeoutMs, resources: previous.resources,
-          gates: previous.gates.filter(g => g.name !== 'process_exit_zero').map(g => g.name)};
+          gates: previous.gates.filter(g => !['process_exit_zero','caller_attestation'].includes(g.name)).map(g => g.name),
+          completionMode: previous.completionMode || 'legacy'};
         if (JSON.stringify(previousImmutable) !== JSON.stringify(immutable)) fail('JOB_KEY_PAYLOAD_CONFLICT');
         return {deduplicated: true, job: copy(previous)};
       }
       const now = iso();
       const job = {id: id('job'), kind: 'runtime_job', taskId, key, command: normalized,
-        required: !!required, readOnly: !!readOnly, resume, maxRestarts, timeoutMs,
+        required: !!required, readOnly: !!readOnly, resume, maxRestarts, timeoutMs, completionMode,
         resources: [...new Set(resources)], operations: [],
         gates: [{name: 'process_exit_zero', passed: false, evidence: null},
+          ...(completionMode === 'attested' && gates.length === 0 ?
+            [{name: 'caller_attestation', passed: false, evidence: null}] : []),
           ...gates.map(name => ({name, passed: false, evidence: null}))],
         attempts: [], state: 'queued', createdAt: now, updatedAt: now, blockReason: null};
       state.jobs[job.id] = job;
@@ -229,8 +243,15 @@ export class Runtime {
       if (job.state === 'completed') return {deduplicated: true, job: copy(job)};
       if (job.state !== 'completion_candidate') fail('JOB_NOT_COMPLETION_CANDIDATE');
       if (job.gates.some(g => !g.passed)) fail('COMPLETION_GATES_PENDING');
+      // No completed attested job may have only the OS process-exit gate.
+      // Custom caller-evidence gates replace, rather than duplicate, the default attestation.
+      if (job.completionMode === 'attested' &&
+        !job.gates.some(g => g.name !== 'process_exit_zero' && g.passed &&
+          typeof g.evidence === 'string' && g.evidence.trim())) fail('CALLER_ATTESTATION_REQUIRED');
+      if (job.completionMode != null && !['attested', 'exit_only'].includes(job.completionMode)) fail('COMPLETION_MODE_INVALID');
       if (unknownEffects(job)) fail('OPERATION_RECONCILIATION_REQUIRED');
       job.state = 'completed';
+      job.completionBasis = completionBasis(job);
       touch(job).completedAt = iso();
       releaseResources(state, job);
       return {deduplicated: false, job: copy(job)};

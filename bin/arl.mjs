@@ -37,7 +37,8 @@ const routes = {
     readOnly: parsed['read-only'] === true,
     resume: parsed.resume || 'manual',
     maxRestarts: Number(parsed.restarts || 0),
-    timeoutMs: Number(parsed.timeout || 0)
+    timeoutMs: Number(parsed.timeout || 0),
+    completionMode: parsed['completion-mode'] || 'attested'
   }),
   start: () => runtime.start({jobId: arg('job')}),
   retry: () => runtime.retry({jobId: arg('job')}),
@@ -66,6 +67,9 @@ Submit:   --task <id> --key <name>
           --command <JSON>  OR  --command-file <JSON file>
           --gate <name>     OR  --gates <JSON array>
           --resources <JSON array>  (optional)
+          --completion-mode attested|exit_only  (default: attested)
+          Default: caller must pass --name caller_attestation with evidence
+          exit_only: explicit, unverified process-exit semantics (no --gate)
 
 Example:  arl accept --root ./demo --key hello --title Hello
 Docs:     https://github.com/Sharky0209/agent-runtime-lite`;

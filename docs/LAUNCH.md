@@ -1,4 +1,4 @@
-# Independent developer trial kit (v0.1.4)
+# Independent developer trial kit (v0.2.0-beta.1)
 
 This file is a **fact sheet and operational checklist**, not copy ready to paste into a community. It does not establish that a post, review or independent adoption happened.
 
@@ -15,7 +15,7 @@ This file is a **fact sheet and operational checklist**, not copy ready to paste
 - Implementation: MIT-licensed, dependency-free Node.js single-host command runner, not an LLM model host, scheduler, durable distributed queue or sandbox.
 - Capabilities: keyed task/job de-duplication, durable local JSON state, separate detached worker, explicit output evidence gates, named resource reservations and conservative handling of uncertain external operations.
 - Crash limits: a Worker can die during child launch; a persisted dispatch intent prevents blind auto-replay but cannot prove remote side effects or protect against all PID reuse.
-- Versions: GitHub preview **v0.1.4**, Node.js **20+**, source and packaged CLI verified on Windows, Ubuntu and macOS; a minimum Node.js 20 runner is also checked on Ubuntu.
+- Versions: GitHub preview **v0.2.0-beta.1**, Node.js **20+**, source and packaged CLI verified on Windows, Ubuntu and macOS; a minimum Node.js 20 runner is also checked on Ubuntu.
 - Privacy: `arl doctor` only reads state and returns aggregate counts. The full `arl status` can contain private commands and verification evidence.
 - Honesty: no independent production users, outside integrations or performance benchmarks have been established by the maintainer.
 - Interesting discussion questions: what completion evidence would a real task need, what environment or command would be tried, and which recovery decisions require a person?
@@ -23,7 +23,7 @@ This file is a **fact sheet and operational checklist**, not copy ready to paste
 ## Trial entry points
 
 - Source: https://github.com/Sharky0209/agent-runtime-lite
-- Release: https://github.com/Sharky0209/agent-runtime-lite/releases/tag/v0.1.4
+- Release: https://github.com/Sharky0209/agent-runtime-lite/releases/tag/v0.2.0-beta.1
 - Quickstart: https://github.com/Sharky0209/agent-runtime-lite/blob/main/docs/QUICKSTART.md
 - Architecture/limits: https://github.com/Sharky0209/agent-runtime-lite/blob/main/docs/ARCHITECTURE.md
 - Read-only diagnosis: https://github.com/Sharky0209/agent-runtime-lite/blob/main/docs/TROUBLESHOOTING.md
@@ -33,7 +33,7 @@ Clean-directory install (Node.js 20+ required; **GitHub Release tarball**, not t
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.4/agent-runtime-lite-0.1.4.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.1/agent-runtime-lite-0.2.0-beta.1.tgz
 npm exec -- arl --version
 npm exec -- arl doctor --root ./trial-state
 ```
