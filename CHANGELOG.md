@@ -4,6 +4,9 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Block stale worker/launcher PID sightings when persisted heartbeats have expired, retaining resource ownership and requiring operator review.
+- Add recovery regression tests using a simulated reused PID and a real terminated worker with an unresolved operation.
+
 - Persist child dispatch intent before process spawn and block uncertain crash-window recovery instead of potentially starting a duplicate child.
 - Retain resource ownership until an operator reconciles the unknown dispatch and explicitly retries; add focused regression coverage.
 

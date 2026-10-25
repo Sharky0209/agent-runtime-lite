@@ -15,6 +15,7 @@ export async function executeWorker(root, jobId, attemptId) {
     }
     const attempt = job.attempts.at(-1);
     attempt.workerPid = process.pid;
+    attempt.heartbeatAt = iso();
     job.state = 'running';
     job.updatedAt = iso();
     return {command: job.command, timeoutMs: job.timeoutMs};
