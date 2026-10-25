@@ -4,6 +4,10 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-26
+
+- Stabilize the explicit-retry regression by waiting for worker and child exit before retry; production safety checks remain unchanged.
+
 - Add a real child-spawn/worker-crash fault-injection regression at the exact spawn-before-PID-write boundary, validating no automatic replay and retained resource ownership.
 
 - Block stale worker/launcher PID sightings when persisted heartbeats have expired, retaining resource ownership and requiring operator review.
