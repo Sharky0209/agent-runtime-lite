@@ -10,7 +10,7 @@ For a new empty local project (Node.js 20+):
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.3/agent-runtime-lite-0.1.3.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.4/agent-runtime-lite-0.1.4.tgz
 npm exec -- arl --version
 npm exec -- arl --help
 ```

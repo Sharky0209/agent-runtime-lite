@@ -36,3 +36,16 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: bash ./examples/quickstart.sh
+
+  node20:
+    name: Node 20 / ubuntu-latest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify minimum supported Node release
+        run: npm test
+      - name: Verify independent packaged consumer
+        run: npm run test:package

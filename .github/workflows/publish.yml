@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: v0.1.3
+          ref: v0.1.4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -20,8 +20,8 @@ jobs:
       - name: Verify tagged package and registry status
         shell: bash
         run: |
-          node -e "const p=require('./package.json'); if(p.name!=='agent-runtime-lite'||p.version!=='0.1.3'){console.error('unexpected package',p.name,p.version); process.exit(1)} console.log(p.name+'@'+p.version)"
-          if lookup="$(npm view agent-runtime-lite@0.1.3 version 2>&1)"; then
+          node -e "const p=require('./package.json'); if(p.name!=='agent-runtime-lite'||p.version!=='0.1.4'){console.error('unexpected package',p.name,p.version); process.exit(1)} console.log(p.name+'@'+p.version)"
+          if lookup="$(npm view agent-runtime-lite@0.1.4 version 2>&1)"; then
             echo "ALREADY PUBLISHED - aborting"
             exit 1
           fi

@@ -10,7 +10,7 @@ Thank you for helping improve Agent Runtime Lite. Contributions from real-world 
 
 ## Local setup
 
-- Node.js >=20, with Node.js 22 used in CI.
+- Node.js >=20; CI exercises the minimum supported Node.js 20 on Ubuntu and Node.js 22 on Windows, macOS and Ubuntu.
 - No npm install step is required for development: there are no third-party runtime dependencies.
 - Run `npm test` and `npm run example`.
 - Every bug fix should include a regression test. Keep tests deterministic, offline, and isolated in temporary directories.

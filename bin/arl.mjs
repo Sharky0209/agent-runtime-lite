@@ -43,6 +43,7 @@ const routes = {
   retry: () => runtime.retry({jobId: arg('job')}),
   recover: () => runtime.recover(),
   status: () => runtime.status({taskId: parsed.task, jobId: parsed.job}),
+  doctor: () => runtime.diagnose(),
   checkpoint: () => runtime.checkpoint({taskId: arg('task'), step: arg('step'), note: parsed.note || ''}),
   'op-begin': () => runtime.beginOperation({jobId: arg('job'), key: arg('key')}),
   'op-confirm': () => runtime.settleOperation({jobId: arg('job'), key: arg('key'), outcome:'confirmed', evidence:arg('evidence')}),
@@ -54,9 +55,10 @@ const usage = `Agent Runtime Lite
 Usage: arl <command> [options]
 
 Commands: accept, submit, start, status, checkpoint, op-begin,
-          op-confirm, op-abort, gate, complete, retry, recover
+          op-confirm, op-abort, gate, complete, retry, recover, doctor
 
 Global:   --root <directory>  Select a local state directory
+Doctor:   arl doctor --root ./demo  (read-only, share-safe counts)
           --help, help        Print this help
           --version, version  Print installed version
 

@@ -6,7 +6,12 @@ import { randomUUID } from 'node:crypto';
 const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const live = (pid) => {
   if (!Number.isInteger(pid) || pid < 1) return false;
-  try { process.kill(pid, 0); return true; } catch { return false; }
+  try { process.kill(pid, 0); return true; }
+  catch (error) {
+    // Permission errors do not prove that a PID is gone; conservatively
+    // retain ownership rather than permitting a duplicate launch or retry.
+    return error?.code === 'EPERM' || error?.code === 'EACCES';
+  }
 };
 const blank = () => ({version: 1, tasks: {}, jobs: {}, taskKeys: {}, jobKeys: {}, resources: {}});
 export const iso = () => new Date().toISOString();

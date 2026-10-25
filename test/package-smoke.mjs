@@ -40,6 +40,9 @@ try{
   assert.match(help,/submit/);
   const installedVersion=JSON.parse(fs.readFileSync(path.join(client,'node_modules','agent-runtime-lite','package.json'),'utf8')).version;
   assert.equal(cli(bin,['--version']),installedVersion);
+  const emptyDiagnosis=JSON.parse(cli(bin,['doctor','--root',runtimeRoot]));
+  assert.equal(emptyDiagnosis.initialized,false);
+  assert.equal(emptyDiagnosis.counts.jobs,0);
   const invalid=spawnSync(process.execPath,[bin,'unknown-command'],
     {cwd:client,encoding:'utf8',windowsHide:true});
   assert.equal(invalid.status,1);
@@ -86,6 +89,10 @@ try{
   const status=JSON.parse(cli(bin,['status','--root',runtimeRoot,'--task',accepted.task.id]));
   assert.equal(status.task.state,'completed');
   assert.equal(status.jobs[0].attempts.length,1);
+  const diagnosis=JSON.parse(cli(bin,['doctor','--root',runtimeRoot]));
+  assert.equal(diagnosis.counts.jobs,1);
+  assert.equal(diagnosis.jobsByState.completed,1);
+  assert.equal(diagnosis.counts.reservedResources,0);
   console.log('PACKAGE_INSTALL_PASS',JSON.stringify({
     version:installedVersion,platform:process.platform,cliShim:true,
     exportResolved:true,helpVerified:true,negativeExitCodes:true,
