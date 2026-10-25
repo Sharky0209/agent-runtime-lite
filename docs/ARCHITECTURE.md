@@ -18,7 +18,7 @@ Agent Runtime Lite is a local, single-host task runner that stores durable state
 2. The caller submits a named job with a command, optional resource reservations, and any additional completion gates.
 3. `start()` reserves named resources and starts a detached Node.js worker.
 4. The worker records attempt process details, runs the configured command, and stores the exit result.
-5. Exit code zero establishes only a completion **candidate**. The caller checks business output and passes any additional gates.
+5. Exit code zero establishes only a completion **candidate**. If additional gates are configured, the caller must check business output and pass those gates; without extra gates, the caller can complete after exit code zero without external readback (v0.1.4 limitation; see issue #13).
 6. `complete()` verifies that all gates are passed and there are no uncertain external operations. The task's derived status then reflects its required jobs.
 
 The state is persisted as an atomic JSON snapshot and synchronized with a local lock. The approach is deliberately simple and works best with small to medium local agent workloads.

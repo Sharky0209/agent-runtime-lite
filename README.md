@@ -7,9 +7,11 @@
 
 **Your agent's CLI session ended. Did its task actually finish?**
 
-Agent Runtime Lite keeps a local task record across separate CLI invocations, launches a detached child process, and distinguishes a successful command exit from a **verified** result. You inspect the real output and explicitly pass a completion gate before the task can be marked done.
+Agent Runtime Lite keeps a local task record across separate CLI invocations, launches a detached child process, and distinguishes a successful command exit from a **verified** result. When you configure an additional completion gate, a caller must inspect the real output and submit evidence before the job can be marked done.
 
 It is a dependency-free Node.js runner for single-host workflows—not an AI model host, a distributed queue, or automatic proof of external business outcomes.
+
+**v0.1.4 verification limitation:** Additional readback gates are currently optional. With no added gate, a child exiting with code 0 satisfies the built-in process gate and the caller may mark its job complete **without verifying the intended artifact**. Submitted gate evidence is a caller assertion, not independently verified by the library. This default is under review in [issue #13](https://github.com/Sharky0209/agent-runtime-lite/issues/13).
 
 ### See the handoff in about a minute
 
