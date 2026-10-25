@@ -10,12 +10,13 @@ For a new empty local project (Node.js 20+):
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.1/agent-runtime-lite-0.2.0-beta.1.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.2/agent-runtime-lite-0.2.0-beta.2.tgz
 npm exec -- arl --version
+npm exec -- arl demo
 npm exec -- arl --help
 ```
 
-This uses a publicly downloadable release asset, **not an npm registry publication**. Downloading/installing the release archive was verified from a separate temporary consumer. Provide your real trial feedback in [the first testers thread](https://github.com/Sharky0209/agent-runtime-lite/issues/3).
+The `arl demo` command runs a real report-writing child and separate CLI readback processes inside a disposable temporary directory. It rejects completion without caller evidence, then checks the report and completes only after the evidence gate passes; no clone, credentials or external systems are required. This uses a publicly downloadable release asset, **not an npm registry publication**. Downloading/installing the release archive was verified from a separate temporary consumer. Provide your real trial feedback in [the first testers thread](https://github.com/Sharky0209/agent-runtime-lite/issues/3).
 
 ## Clone and test
 

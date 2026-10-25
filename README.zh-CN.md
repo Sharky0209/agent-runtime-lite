@@ -30,7 +30,7 @@ The original CLI process did not need to remain open.
 
 **真实文件示例：** 执行 `node examples/report-file-handoff.mjs`，后台进程会生成 `report.json`，后续独立 CLI 进程读回文件并校验汇总值，通过后才允许完成任务。只需要 Node.js 20+，不依赖 npm Registry 服务。
 
-**版本：v0.2.0-beta.1，MIT 许可证，面向单机任务运行场景。**
+**版本：v0.2.0-beta.2，MIT 许可证，面向单机任务运行场景。**
 
 ## 不克隆源码，直接安装体验
 
@@ -38,12 +38,13 @@ The original CLI process did not need to remain open.
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.1/agent-runtime-lite-0.2.0-beta.1.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.2/agent-runtime-lite-0.2.0-beta.2.tgz
 npm exec -- arl --version
+npm exec -- arl demo
 npm exec -- arl --help
 ```
 
-这是已验证的 **GitHub Release 安装包**，并非已经发布到 npm 官方包仓库。想查看完整运行、独立进程接力和验收证明，请看 [5 分钟入门](docs/QUICKSTART.md)。欢迎在 [第一批试用者反馈帖](https://github.com/Sharky0209/agent-runtime-lite/issues/3) 反馈真实体验，无需给仓库刷 Star。
+这是已验证的 **GitHub Release 安装包**，并非已经发布到 npm 官方包仓库。**`arl demo` 不需要克隆仓库**，会用全新临时目录真实生成文件、跨 CLI 进程独立读回、拒绝未验收完成，成功后清理演示目录。想查看完整运行、独立进程接力和验收证明，请看 [5 分钟入门](docs/QUICKSTART.md)。欢迎在 [第一批试用者反馈帖](https://github.com/Sharky0209/agent-runtime-lite/issues/3) 反馈真实体验，无需给仓库刷 Star。
 
 ## 核心功能
 

@@ -38,8 +38,12 @@ try{
   const help=run('npm',['exec','--offline','--','arl','--help'],client);
   assert.match(help,/--command-file/);
   assert.match(help,/submit/);
+  assert.match(help,/arl demo/);
   const installedVersion=JSON.parse(fs.readFileSync(path.join(client,'node_modules','agent-runtime-lite','package.json'),'utf8')).version;
   assert.equal(cli(bin,['--version']),installedVersion);
+  // This runs the real detached worker and separate CLI callers from the installed package.
+  // It is the friction-free first action advertised to prospective users.
+  assert.match(cli(bin,['demo']),/DEMO_REAL_FILE_READBACK_PASS/);
   const emptyDiagnosis=JSON.parse(cli(bin,['doctor','--root',runtimeRoot]));
   assert.equal(emptyDiagnosis.initialized,false);
   assert.equal(emptyDiagnosis.counts.jobs,0);
