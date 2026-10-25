@@ -4,6 +4,8 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Replace generated community-post drafts with a fact-checked, human-authored outreach checklist and a seven-day evidence-based independent trial plan.
+
 ## [0.1.4] - 2026-10-26
 
 - Add a read-only, privacy-preserving `arl doctor` for aggregate workspace diagnostics and safe public bug reporting.
