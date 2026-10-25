@@ -6,7 +6,7 @@ import {StateStore, iso} from './state.mjs';
 
 // Only this process owns the OS child execution and process-exit gate.
 // Parent task state remains derived from the jobs; it is never set by worker PID.
-export async function executeWorker(root, jobId, attemptId) {
+export async function executeWorker(root, jobId, attemptId, {afterChildSpawn} = {}) {
   const store = new StateStore(root);
   const spec = store.update(state => {
     const job = state.jobs[jobId];
@@ -39,6 +39,9 @@ export async function executeWorker(root, jobId, attemptId) {
     windowsHide: true,
     shell: false
   });
+  // Test seam: inject a real worker crash in the narrow spawn-before-PID-write window.
+  // Normal CLI workers never supply this callback.
+  afterChildSpawn?.(child);
   store.update(state => {
     const job = state.jobs[jobId];
     const attempt = job?.attempts.find(a => a.id === attemptId);

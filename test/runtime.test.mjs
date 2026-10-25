@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {spawn, spawnSync} from 'node:child_process';
+import {pathToFileURL} from 'node:url';
 import {Runtime} from '../src/runtime.mjs';
 import {processAlive} from '../src/state.mjs';
 
@@ -179,6 +180,82 @@ test('uncertain child dispatch does not auto-restart or release its resource', (
     assert.equal(job.attempts.length, 1);
     assert.throws(() => f.rt.start({jobId:follower}), /RESOURCE_BUSY/);
   } finally {f.cleanup();}
+});
+
+test('actual worker crash after spawn but before PID persistence never auto-replays', async () => {
+  const f = make();
+  const pidRecord = path.join(f.root, 'spawned-child.pid');
+  const childOutput = path.join(f.root, 'child-executed.txt');
+  let spawnedChildPid = null;
+  let faultWorkerPid = null;
+  try {
+    const taskId = f.rt.accept({key:'real-spawn-gap',title:'Real spawn gap'}).task.id;
+    const holder = f.rt.submit({
+      taskId, key:'holder',
+      command:command(
+        'require("node:fs").appendFileSync(' + JSON.stringify(childOutput) + ', "once\\n"); setTimeout(() => {}, 6000)'
+      ),
+      readOnly:true, resume:'auto_safe', maxRestarts:2, resources:['shared:spawn-gap']
+    }).job.id;
+    const contender = f.rt.submit({taskId,key:'contender',command:command(),resources:['shared:spawn-gap']}).job.id;
+    const attemptId = 'fault-injected-real-spawn';
+    f.rt.store.update(state => {
+      state.jobs[holder].state = 'launching';
+      state.jobs[holder].attempts.push({
+        id:attemptId,startedAt:new Date().toISOString(),workerPid:null,childPid:null,exitCode:null
+      });
+      state.resources['shared:spawn-gap'] = holder;
+    });
+    const workerModule = pathToFileURL(path.resolve('src/worker.mjs')).href;
+    const bootstrap = [
+      'import fs from "node:fs";',
+      'import {executeWorker} from ' + JSON.stringify(workerModule) + ';',
+      'executeWorker(' + [f.root,holder,attemptId].map(v => JSON.stringify(v)).join(',') +
+        ', {afterChildSpawn(child) {',
+      '  for (let i = 0; i < 150 && !fs.existsSync(' + JSON.stringify(childOutput) + '); i++) {',
+      '    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);',
+      '  }',
+      '  if (!fs.existsSync(' + JSON.stringify(childOutput) + ')) process.exit(78);',
+      '  fs.writeFileSync(' + JSON.stringify(pidRecord) + ', String(child.pid));',
+      '  process.exit(79);',
+      '}});'
+    ].join('\n');
+    const worker = spawn(process.execPath,['--input-type=module','-e',bootstrap],
+      {stdio:['ignore','pipe','pipe'],windowsHide:true});
+    faultWorkerPid = worker.pid;
+    const result = await new Promise((resolve,reject) => {
+      let stderr = '';
+      worker.stderr.on('data', data => stderr += data);
+      worker.on('error',reject);
+      worker.on('close',code => resolve({code,stderr}));
+    });
+    assert.equal(result.code,79,result.stderr);
+    spawnedChildPid = Number(fs.readFileSync(pidRecord,'utf8'));
+    assert.ok(Number.isInteger(spawnedChildPid) && spawnedChildPid > 0);
+    await wait(() => fs.existsSync(childOutput) && fs.readFileSync(childOutput,'utf8') === 'once\n',8000);
+    const before = f.rt.status({jobId:holder}).job;
+    assert.equal(before.state,'running');
+    assert.ok(before.attempts[0].spawnIntentAt);
+    assert.equal(before.attempts[0].childPid,null,'crash preceded the durable PID write');
+    assert.equal(before.attempts[0].workerPid,faultWorkerPid);
+    const recovered = f.rt.recover();
+    assert.equal(recovered.changed[0].reason,'CHILD_DISPATCH_UNCERTAIN');
+    assert.equal(recovered.restarted.length,0);
+    assert.equal(f.rt.status({jobId:holder}).job.state,'blocked');
+    assert.equal(f.rt.recover().restarted.length,0);
+    assert.equal(f.rt.status({jobId:holder}).job.attempts.length,1);
+    assert.equal(fs.readFileSync(childOutput,'utf8'),'once\n');
+    assert.throws(() => f.rt.start({jobId:contender}),/RESOURCE_BUSY/);
+    assert.equal(f.rt.store.read().resources['shared:spawn-gap'],holder);
+  } finally {
+    if (spawnedChildPid && processAlive(spawnedChildPid)) {
+      try {process.kill(spawnedChildPid);} catch {}
+    }
+    if (faultWorkerPid && processAlive(faultWorkerPid)) {
+      try {process.kill(faultWorkerPid);} catch {}
+    }
+    f.cleanup();
+  }
 });
 
 test('operation reconciliation keeps a reservation held by an unknown child', () => {

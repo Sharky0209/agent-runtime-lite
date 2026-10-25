@@ -4,6 +4,8 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Add a real child-spawn/worker-crash fault-injection regression at the exact spawn-before-PID-write boundary, validating no automatic replay and retained resource ownership.
+
 - Block stale worker/launcher PID sightings when persisted heartbeats have expired, retaining resource ownership and requiring operator review.
 - Add recovery regression tests using a simulated reused PID and a real terminated worker with an unresolved operation.
 
