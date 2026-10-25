@@ -4,6 +4,8 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Clarify that v0.1.4 does not require an external readback gate by default; caller-submitted evidence is not independently verified.
+
 - Replace generated community-post drafts with a fact-checked, human-authored outreach checklist and a seven-day evidence-based independent trial plan.
 
 ## [0.1.4] - 2026-10-26
