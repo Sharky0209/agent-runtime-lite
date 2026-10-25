@@ -8,9 +8,22 @@ import {pathToFileURL} from 'node:url';
 import {Runtime} from '../src/runtime.mjs';
 import {processAlive} from '../src/state.mjs';
 
+// Windows can report EBUSY for a short time *after* a killed process PID
+// disappears. Retry fixture teardown explicitly instead of treating that
+// unrelated filesystem timing as a runtime recovery failure.
+const cleanupFixture = (root, remove = fs.rmSync) => {
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try { remove(root, {recursive:true,force:true}); return; }
+    catch (error) {
+      if (!['EBUSY','ENOTEMPTY','EPERM','EACCES'].includes(error.code) || attempt === 19) throw error;
+      Atomics.wait(pause, 0, 0, 150);
+    }
+  }
+};
 const make = () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arl-test-'));
-  return {root, rt: new Runtime(root), cleanup: () => fs.rmSync(root, {recursive: true, force: true, maxRetries: 8, retryDelay: 150})};
+  return {root, rt: new Runtime(root), cleanup: () => cleanupFixture(root)};
 };
 const command = (body = 'console.log("success")') => ({exe: process.execPath, args: ['-e', body]});
 const attest = (rt, jobId) => rt.passGate({jobId,name:'caller_attestation',evidence:'Caller reviewed isolated test result'});
@@ -23,6 +36,18 @@ const wait = async (check, timeout = 12000) => {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 };
+
+test('test fixture teardown retries temporary EBUSY and still removes its directory', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arl-cleanup-test-'));
+  let attempts = 0;
+  cleanupFixture(root, (...args) => {
+    attempts++;
+    if (attempts < 3) {const error = new Error('transient locked handle'); error.code='EBUSY'; throw error;}
+    return fs.rmSync(...args);
+  });
+  assert.equal(attempts,3);
+  assert.equal(fs.existsSync(root),false);
+});
 
 test('task acceptance is idempotent across separate Runtime instances', () => {
   const f = make();
