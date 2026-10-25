@@ -17,16 +17,26 @@ Current status: **no public npm Registry package has been confirmed**, and this 
 
 ## First publication requires the owner's npm authorization
 
-GitHub ownership alone does **not** authorize npm registry publication. As of the initial audit, `npm whoami` returned `E401`, public `npm view agent-runtime-lite` returned `E404`, and there was no `NPM_PUBLISH_TOKEN` repository secret. An `E404` does not permanently reserve the name: the registry must be checked again immediately before publishing.
+GitHub ownership alone does **not** authorize npm registry publication. As of the most recent local check, `npm whoami` returned `E401`, public `npm view agent-runtime-lite` returned `E404`, and there was no `NPM_PUBLISH_TOKEN` repository secret. The original GitHub Release archive has already passed a real SHA-256 comparison and `npm publish --dry-run --tag beta` with no upload. An `E404` does not permanently reserve the name: the registry must be checked again immediately before publishing.
 
 **Option A — One-time local bootstrap, then trusted publishing (recommended):**
 
 1. The actual package owner signs in to their own npmjs.com account, enables 2FA, and uses `npm login` locally (complete all browser/authenticator steps themselves; **never paste OTPs, passwords or npm tokens into ChatGPT**).
 2. Confirm `npm whoami` prints the intended npm account. Verify the package name is available. If another party owns the name, **stop** — do not attempt to overwrite it.
-3. Make a clean temporary checkout of the reviewed `v0.2.0-beta.2` tag; verify `package.json` lists the exact version, run `npm test`, `npm run test:package`, and inspect `npm pack --dry-run --json`. Do not publish whatever happens to be in a modified local worktree.
-4. After inspecting the package contents, perform the authorized initial public **beta-only** publish from the exact tagged source using `npm publish --access public --tag beta --ignore-scripts`. Do not include `--provenance` unless the local environment actually supports a provenance provider.
-5. Independently read `npm view agent-runtime-lite@0.2.0-beta.2 version` and `npm view agent-runtime-lite dist-tags --json`; confirm that `beta` points to `0.2.0-beta.2` and no unintentional `latest` was introduced.
-6. Now that a package exists, its owner can configure npm **Trusted Publisher** in the npmjs.com package settings: GitHub owner `Sharky0209`, repository `agent-runtime-lite`, workflow filename `publish.yml`; enable direct publish only if wanted. Configuration must be used successfully within npm's validation window. Future reviewed versions can use GitHub Actions' OIDC without storing a long-lived token.
+3. **Preferred first-publication source:** download the already tested `v0.2.0-beta.2` GitHub Release archive into a fresh temporary directory using `gh release download`. Verify SHA-256 **`3b2f396427ee6b7a3aa034119dbcac92558fefb29943e311802793a5fa236ccf`**, the digest independently recorded when the release asset was first published. This avoids accidentally publishing newer/unreviewed files from the local working tree. Example (from the temporary directory): `gh release download v0.2.0-beta.2 --repo Sharky0209/agent-runtime-lite --pattern agent-runtime-lite-0.2.0-beta.2.tgz`. Keep the archive only in a disposable directory, not in the project's tracked source tree.
+4. Run the following safe preflight from the directory containing the downloaded archive (the dry run was actually performed on the released tarball and succeeded without npm credentials):
+   ```sh
+   sha256sum agent-runtime-lite-0.2.0-beta.2.tgz
+   npm publish ./agent-runtime-lite-0.2.0-beta.2.tgz --dry-run --access public --tag beta --ignore-scripts
+   ```
+   Check that the digest matches exactly and that npm identifies `agent-runtime-lite@0.2.0-beta.2`. npm may repackage the archive internally; its displayed prospective upload checksum need not equal the original GitHub asset checksum. Recheck registry name/version availability before continuing.
+5. **Only after successful `npm whoami` and explicit owner authorization**, run the live equivalent, which performs an irreversible public registry publish:
+   ```sh
+   npm publish ./agent-runtime-lite-0.2.0-beta.2.tgz --access public --tag beta --ignore-scripts
+   ```
+   The user must complete any npm browser/2FA challenge themselves. Do not include `--provenance` unless the local environment actually supports a provenance provider.
+6. Independently read `npm view agent-runtime-lite@0.2.0-beta.2 version` and `npm view agent-runtime-lite dist-tags --json`; confirm that `beta` points to `0.2.0-beta.2` and no unintentional `latest` was introduced. Then install the published package from npm into a new directory and actually run `arl demo`.
+7. Now that a package exists, its owner can configure npm **Trusted Publisher** in the npmjs.com package settings: GitHub owner `Sharky0209`, repository `agent-runtime-lite`, workflow filename `publish.yml`; enable direct publish only if wanted. Configuration must be used successfully within npm's validation window. Future reviewed versions can use GitHub Actions' OIDC without storing a long-lived token.
 
 **Option B — Manually authorized GitHub Actions bootstrap:**
 
