@@ -11,6 +11,10 @@ This page tracks ways to evaluate whether Agent Runtime Lite helps independent d
 
 GitHub Stars, page views and forks do not by themselves establish real product usage.
 
+## Seven-day independent trial
+
+The [independent developer trial kit](LAUNCH.md) contains verifiable technical facts, installation checks, an evidence-based daily follow-up plan and community-rule links. It is **not AI-written material to paste into communities**: Hacker News and V2EX require original, human-authored posts and prohibit generated submissions. Participation should be organic and never involve automated posting or solicitations for votes.
+
 ## Try it and leave feedback
 
 1. Install the verified [GitHub Release tarball](https://github.com/Sharky0209/agent-runtime-lite/releases/tag/v0.1.4) from the README, or run the [five-minute quickstart](QUICKSTART.md) with a local checkout.

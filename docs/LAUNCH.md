@@ -1,80 +1,67 @@
-# First-user launch kit (v0.1.4)
+# Independent developer trial kit (v0.1.4)
 
-This is copy for outreach, not evidence that any third-party adoption or community posting happened. Update the install line to `npm install agent-runtime-lite` only after a live registry readback and a clean consumer installation confirm the npm publication.
+This file is a **fact sheet and operational checklist**, not copy ready to paste into a community. It does not establish that a post, review or independent adoption happened.
 
-## Single sentence
+## Community rules first
 
-**Agent conversations and CLI calls can end before the work is finished. Agent Runtime Lite keeps single-host task state across independent CLI invocations and requires evidence before a successful job can be marked complete.**
+- [Hacker News submission guidelines](https://news.ycombinator.com/newsguidelines.html) say not to automate posting or submit generated text. A human member must decide whether to post and write their own title and description, respond to questions, and observe the community rules.
+- [Show HN guidelines](https://news.ycombinator.com/showhn.html) require something other developers can actually try. See also [temporary Show HN restrictions](https://news.ycombinator.com/showlim); a first-time account may not be eligible yet. An ordinary update announcing only a version bump is not a strong Show HN submission.
+- [V2EX community guidelines](https://www.v2ex.com/about) also prohibit AI-generated text. The [分享创造 node](https://www.v2ex.com/help/node) welcomes individually built projects, whereas promotion has a different node. The account owner should compose and submit their own original description after reviewing the site's rules.
+- No AI-authored or automatically posted copy, fake accounts, bought views/stars or solicited upvotes. Do not share credentials with this project or its maintainer.
 
-## 60-second terminal walkthrough
+## Verifiable facts a human author may choose to cover
 
-Run with Node.js 20+:
+- Problem: a command returning successfully is not the same as the intended output having been inspected and accepted.
+- Implementation: MIT-licensed, dependency-free Node.js single-host command runner, not an LLM model host, scheduler, durable distributed queue or sandbox.
+- Capabilities: keyed task/job de-duplication, durable local JSON state, separate detached worker, explicit output evidence gates, named resource reservations and conservative handling of uncertain external operations.
+- Crash limits: a Worker can die during child launch; a persisted dispatch intent prevents blind auto-replay but cannot prove remote side effects or protect against all PID reuse.
+- Versions: GitHub preview **v0.1.4**, Node.js **20+**, source and packaged CLI verified on Windows, Ubuntu and macOS; a minimum Node.js 20 runner is also checked on Ubuntu.
+- Privacy: `arl doctor` only reads state and returns aggregate counts. The full `arl status` can contain private commands and verification evidence.
+- Honesty: no independent production users, outside integrations or performance benchmarks have been established by the maintainer.
+- Interesting discussion questions: what completion evidence would a real task need, what environment or command would be tried, and which recovery decisions require a person?
+
+## Trial entry points
+
+- Source: https://github.com/Sharky0209/agent-runtime-lite
+- Release: https://github.com/Sharky0209/agent-runtime-lite/releases/tag/v0.1.4
+- Quickstart: https://github.com/Sharky0209/agent-runtime-lite/blob/main/docs/QUICKSTART.md
+- Architecture/limits: https://github.com/Sharky0209/agent-runtime-lite/blob/main/docs/ARCHITECTURE.md
+- Read-only diagnosis: https://github.com/Sharky0209/agent-runtime-lite/blob/main/docs/TROUBLESHOOTING.md
+- Feedback: https://github.com/Sharky0209/agent-runtime-lite/issues/3
+
+Clean-directory install (Node.js 20+ required; **GitHub Release tarball**, not the npm registry):
+
+```sh
+npm init -y
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.4/agent-runtime-lite-0.1.4.tgz
+npm exec -- arl --version
+npm exec -- arl doctor --root ./trial-state
+```
+
+Run the real detached-process and readback example from a clone:
 
 ```sh
 git clone https://github.com/Sharky0209/agent-runtime-lite.git
 cd agent-runtime-lite
 npm run demo:handoff
+node examples/report-file-handoff.mjs
 ```
 
-Record the terminal showing these truthful milestones:
+The demo illustrates **CLI caller handoff**; it does not guarantee automatic recovery from every crash or a machine restart.
 
-1. First CLI invocation returns and prints the detached worker PID.
-2. A fresh CLI invocation sees `completion_candidate` after the real child finishes.
-3. Completion without the declared gate is rejected.
-4. The demo reads the real child log and passes the gate.
-5. Task state becomes `completed`; only one worker attempt is recorded.
+## Seven-day independent-trial procedure
 
-A caller/session handoff is **not** a demonstration of automatic worker-crash or machine-reboot recovery.
+| Day | Maintainer action | Evidence to record |
+| --- | --- | --- |
+| 1 | Check tagged archive, install instructions, CI and feedback issue | Release URL, green CI URL and independent packaged-install readback |
+| 2 | If an eligible member is available, let them personally write an original V2EX or HN introduction following the site's rules | Actual public post URL; if not posted, record `not published` |
+| 3–4 | Read incoming public comments, questions and reproduction details | Links to real external reports, OS/Node version, whether the report reproduces |
+| 5 | Prioritize blockers that keep developers from trying the tool | Issue IDs, narrow reproduction, test results and fix link when one exists |
+| 6 | Recheck documented steps in a new temporary directory | Exact version, installed CLI, absence of secret data in diagnostics |
+| 7 | Summarize what was actually learned; decide continue/pivot | External trials confirmed with consent, real reports fixed, unresolved blockers and next decision |
 
-For a tangible deliverable beyond the terminal-output demo, run `node examples/report-file-handoff.mjs`. It generates a real JSON report, rejects completion before file readback, then validates the file before passing its completion gate.
+The goal of three independent feedback reports is an **aspiration**, not an announced result. A clone, download, page view or maintainer-run CI is not evidence of a real outside user. Only a voluntary, attributable report from an unrelated developer or permissioned project integration counts as verified adoption.
 
-## Hacker News — Show HN
+## Reporting and conduct
 
-Title: `Show HN: Agent Runtime Lite – local durable jobs with completion gates`
-
-Body:
-
-I built a small MIT-licensed Node.js runner for a problem I kept running into with task-oriented agents: the CLI invocation ends, but work still needs a durable record, and an exit code of 0 does not prove the intended result was verified.
-
-It starts detached local subprocesses, persists task/job/attempt state, and lets another CLI invocation inspect and finish the work. You explicitly pass a completion gate after checking evidence. Uncertain external effects have to be reconciled rather than blindly retried.
-
-This is a single-host preview, not a distributed queue or an LLM framework. It cannot automatically verify arbitrary external systems.
-
-A minimal demo (`npm run demo:handoff`) launches a real child, hands off to fresh CLI processes, rejects premature completion, reads the output log, and then completes the task.
-
-Code and 5-minute quickstart: https://github.com/Sharky0209/agent-runtime-lite
-
-I'd especially appreciate criticism from developers maintaining long-running local agent tasks. What would prevent you from integrating a small runtime like this?
-
-## V2EX — 分享创造
-
-标题：`开源一个轻量 Node.js Agent 任务运行器：跨 CLI 会话续接、完成前验收（MIT）`
-
-正文：
-
-最近把自己在 Agent 自动化里遇到的一个小问题独立成了开源项目：CLI 返回了，不代表任务真正完成；子进程退出码为 0，也不代表结果已经核验。
-
-Agent Runtime Lite 是一个单机运行、没有第三方 npm 依赖的小框架，核心是：
-- 任务 / Job / Attempt 状态落盘，换一个 CLI 进程还能读回；
-- 后台子进程执行完成，先进入待验收状态；
-- 提供明确的完成门槛，核实输出后再标记完成；
-- 外部效果不明确时保留待核对状态，不自动重复执行。
-
-一分钟本地体验（Node.js 20+）：
-
-```sh
-git clone https://github.com/Sharky0209/agent-runtime-lite.git
-cd agent-runtime-lite
-npm run demo:handoff
-```
-
-演示的是真实子进程和跨 CLI 调用接力，不是 Worker 崩溃后的任意自动恢复，也不是分布式调度服务。
-
-仓库：https://github.com/Sharky0209/agent-runtime-lite
-使用说明：https://github.com/Sharky0209/agent-runtime-lite/blob/main/docs/QUICKSTART.md
-
-现在想请做过 Agent / CLI / 自动化任务系统的开发者直接挑毛病：你们实际使用中最看重哪些保证？如果按 README 跑不通，也欢迎给复现步骤。
-
-## First feedback checkpoint
-
-Record independently verified facts, not vanity targets: public link to the post; direct demo feedback; number of external attempts with permission to cite; failures reproducible from an empty directory; and any real integration confirmed by its author. Don't infer adoption from Stars or views.
+Ask for the smallest anonymized reproduction. Never request a token, password, customer record or unredacted `arl status`. Respond to critique with concrete data; do not argue with feedback or create promotional reply chains. If a platform or account is not eligible, **do not bypass it**. Use the project's own GitHub feedback issue and wait for genuine interest.
