@@ -10,7 +10,20 @@ Agent Runtime Lite 让任务状态能被后续独立 CLI 进程接手：启动�
 
 **注意能力边界：** `caller_attestation` 的证据是调用方声明，并不代表本库能自行核实第三方系统。仅按退出码判断的任务必须显式选择 `completionMode: 'exit_only'`（CLI：`--completion-mode exit_only`），完成时标记为 `process_exit_only`。已经落盘的 v0.1.x 任务保留旧验收规则。请看 [v0.2 升级指南](docs/MIGRATION_V02.md)。
 
-### 一分钟看懂实际效果
+## 不克隆源码，直接安装体验
+
+新建一个空文件夹，使用 Node.js 20+ 与 npm：
+
+```sh
+npm init -y
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.2/agent-runtime-lite-0.2.0-beta.2.tgz
+npm exec -- arl --version
+npm exec -- arl demo
+```
+
+这是已验证的 **GitHub Release 安装包**，不是 npm 官方包仓库中的安装。 `arl demo` 会启动真实后台子进程，另一个 CLI 进程读取并核对生成的文件；没有验收证据时会拒绝完成，通过检查后才完成任务。演示成功后会清理自己的临时目录。
+
+### 一分钟看懂完整接力（需要克隆源码）
 
 ```sh
 git clone https://github.com/Sharky0209/agent-runtime-lite.git
@@ -32,19 +45,7 @@ The original CLI process did not need to remain open.
 
 **版本：v0.2.0-beta.2，MIT 许可证，面向单机任务运行场景。**
 
-## 不克隆源码，直接安装体验
-
-新建一个空文件夹，使用 Node.js 20+ 与 npm：
-
-```sh
-npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.2/agent-runtime-lite-0.2.0-beta.2.tgz
-npm exec -- arl --version
-npm exec -- arl demo
-npm exec -- arl --help
-```
-
-这是已验证的 **GitHub Release 安装包**，并非已经发布到 npm 官方包仓库。**`arl demo` 不需要克隆仓库**，会用全新临时目录真实生成文件、跨 CLI 进程独立读回、拒绝未验收完成，成功后清理演示目录。想查看完整运行、独立进程接力和验收证明，请看 [5 分钟入门](docs/QUICKSTART.md)。欢迎在 [第一批试用者反馈帖](https://github.com/Sharky0209/agent-runtime-lite/issues/3) 反馈真实体验，无需给仓库刷 Star。
+欢迎在 [第一批试用者反馈帖](https://github.com/Sharky0209/agent-runtime-lite/issues/3) 反馈真实体验，无需给仓库刷 Star。
 
 ## 核心功能
 

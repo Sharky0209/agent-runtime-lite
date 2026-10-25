@@ -13,7 +13,20 @@ It is a dependency-free Node.js runner for single-host workflows—not an AI mod
 
 **Important distinction:** `caller_attestation` is a statement supplied by the caller; the library does **not** independently verify external file contents or business outcomes. New jobs can explicitly use `completionMode: 'exit_only'` when OS exit code is sufficient; their completion is labeled `process_exit_only`, not attested. Previously saved v0.1.x jobs retain their original gates. See the [v0.2 migration guide](docs/MIGRATION_V02.md).
 
-### See the handoff in about a minute
+## Try the public preview (no source checkout)
+
+From a new, empty directory with Node.js 20+ and npm:
+
+```sh
+npm init -y
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.2/agent-runtime-lite-0.2.0-beta.2.tgz
+npm exec -- arl --version
+npm exec -- arl demo
+```
+
+This installs the **GitHub Release tarball**, not a package from the npm registry. `arl demo` starts a real detached child, reads its generated report in a separate CLI process, rejects completion without evidence, verifies the file and then completes the job. It removes its disposable workspace after success.
+
+### See the full handoff flow (source checkout)
 
 ```sh
 git clone https://github.com/Sharky0209/agent-runtime-lite.git
@@ -31,25 +44,11 @@ Worker attempts: 1
 The original CLI process did not need to remain open.
 ```
 
-**Want a file-based example?** Run `node examples/report-file-handoff.mjs` to generate a real `report.json` in a detached subprocess, read the file from a fresh CLI caller, reject completion until its contents are checked, and then complete the task. Both demos need only Node.js 20+.
+**Want a file-based example?** Run `node examples/report-file-handoff.mjs` to generate a real `report.json` in a detached subprocess, read the file from a fresh CLI caller, reject completion until its contents are checked, and then complete the task. These demos need only Node.js 20+.
 
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
 Version 0.2.0-beta.2 · MIT licensed · Built for single-host, recoverable agent workflows.
-
-## Try the public preview (no source checkout)
-
-From a new, empty directory with Node.js 20+ and npm:
-
-```sh
-npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.2/agent-runtime-lite-0.2.0-beta.2.tgz
-npm exec -- arl --version
-npm exec -- arl demo
-npm exec -- arl --help
-```
-
-This downloads the publicly available **GitHub Release tarball**; the package is not yet published to the npm registry. The direct URL installation was tested in a clean temporary project. **`arl demo` needs no source checkout:** it runs a real detached child, checks a generated report in a separate CLI caller, rejects unverified completion, and removes its disposable temporary workspace after success. To see real detached execution and caller handoff, follow the [five-minute quickstart](docs/QUICKSTART.md).
 
 **First independent users:** share honest installation/use-case feedback in [the public tester thread](https://github.com/Sharky0209/agent-runtime-lite/issues/3). You do not need to star the repository.
 
