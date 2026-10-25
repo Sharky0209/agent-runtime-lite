@@ -1,4 +1,4 @@
-# Migrating from v0.1.x to v0.2.0-beta.1
+# Migrating from v0.1.x to v0.2 beta
 
 **This beta deliberately changes the default completion contract for newly submitted jobs.** It does not migrate, reset or silently rewrite jobs already stored under a workspace's `.arl/state.json`.
 

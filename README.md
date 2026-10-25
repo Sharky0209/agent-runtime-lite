@@ -35,7 +35,7 @@ The original CLI process did not need to remain open.
 
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
-Version 0.2.0-beta.1 · MIT licensed · Built for single-host, recoverable agent workflows.
+Version 0.2.0-beta.2 · MIT licensed · Built for single-host, recoverable agent workflows.
 
 ## Try the public preview (no source checkout)
 
@@ -43,12 +43,13 @@ From a new, empty directory with Node.js 20+ and npm:
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.1/agent-runtime-lite-0.2.0-beta.1.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.2/agent-runtime-lite-0.2.0-beta.2.tgz
 npm exec -- arl --version
+npm exec -- arl demo
 npm exec -- arl --help
 ```
 
-This downloads the publicly available **GitHub Release tarball**; the package is not yet published to the npm registry. The direct URL installation was tested in a clean temporary project. To see real detached execution and caller handoff, follow the [five-minute quickstart](docs/QUICKSTART.md).
+This downloads the publicly available **GitHub Release tarball**; the package is not yet published to the npm registry. The direct URL installation was tested in a clean temporary project. **`arl demo` needs no source checkout:** it runs a real detached child, checks a generated report in a separate CLI caller, rejects unverified completion, and removes its disposable temporary workspace after success. To see real detached execution and caller handoff, follow the [five-minute quickstart](docs/QUICKSTART.md).
 
 **First independent users:** share honest installation/use-case feedback in [the public tester thread](https://github.com/Sharky0209/agent-runtime-lite/issues/3). You do not need to star the repository.
 

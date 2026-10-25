@@ -4,6 +4,11 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+## [0.2.0-beta.2] - 2026-10-26
+
+- Add a real `arl demo` to the installed CLI: an isolated, no-clone first-run experience with a detached report-writing child, separate CLI readback, rejected premature completion, caller evidence, and cleanup after success.
+- Include a packaged-consumer regression that executes the demo and verify it in Windows, Linux and macOS CI. No change to completion policy or existing workspace state.
+
 ## [0.2.0-beta.1] - 2026-10-26
 
 - **Breaking (new jobs only):** default completion mode is now `attested`; a caller must supply evidence for custom gates, or the mandatory `caller_attestation` when none were configured.

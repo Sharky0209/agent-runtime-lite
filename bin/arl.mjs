@@ -56,10 +56,11 @@ const usage = `Agent Runtime Lite
 Usage: arl <command> [options]
 
 Commands: accept, submit, start, status, checkpoint, op-begin,
-          op-confirm, op-abort, gate, complete, retry, recover, doctor
+          op-confirm, op-abort, gate, complete, retry, recover, doctor, demo
 
 Global:   --root <directory>  Select a local state directory
-Doctor:   arl doctor --root ./demo  (read-only, share-safe counts)
+Doctor:   arl doctor --root ./state  (read-only, share-safe counts)
+Demo:     arl demo  Run a disposable real-file handoff and verification
           --help, help        Print this help
           --version, version  Print installed version
 
@@ -75,7 +76,10 @@ Example:  arl accept --root ./demo --key hello --title Hello
 Docs:     https://github.com/Sharky0209/agent-runtime-lite`;
 try {
   if (parsed.help === true || command === 'help') console.log(usage);
-  else if (parsed.version === true || command === 'version') {
+  else if (command === 'demo') {
+    const {runDemo} = await import('../src/demo.mjs');
+    await runDemo();
+  } else if (parsed.version === true || command === 'version') {
     console.log(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
   } else {
     if (!routes[command]) throw Error('UNKNOWN_COMMAND: ' + String(command) + '\n' + usage);
