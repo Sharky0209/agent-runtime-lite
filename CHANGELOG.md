@@ -4,6 +4,13 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+## [0.2.0-beta.1] - 2026-10-26
+
+- **Breaking (new jobs only):** default completion mode is now `attested`; a caller must supply evidence for custom gates, or the mandatory `caller_attestation` when none were configured.
+- Add explicit `completionMode: 'exit_only'` / `--completion-mode exit_only` for intentional, clearly labeled exit-code-only jobs; this mode cannot take additional gates.
+- Record completion basis (`caller_attested`, `process_exit_only` or explicit legacy basis), prevent bypass when a mandatory gate is missing, and reject idempotency reuse across incompatible contracts.
+- Preserve the exact completion requirements of already-persisted v0.1.x jobs without silently rewriting their gates. Add a migration guide and real CLI/file readback, failure, retry and legacy tests.
+
 - Clarify that v0.1.4 does not require an external readback gate by default; caller-submitted evidence is not independently verified.
 
 - Replace generated community-post drafts with a fact-checked, human-authored outreach checklist and a seven-day evidence-based independent trial plan.

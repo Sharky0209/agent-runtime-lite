@@ -10,9 +10,10 @@ import {processAlive} from '../src/state.mjs';
 
 const make = () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arl-test-'));
-  return {root, rt: new Runtime(root), cleanup: () => fs.rmSync(root, {recursive: true, force: true})};
+  return {root, rt: new Runtime(root), cleanup: () => fs.rmSync(root, {recursive: true, force: true, maxRetries: 8, retryDelay: 150})};
 };
 const command = (body = 'console.log("success")') => ({exe: process.execPath, args: ['-e', body]});
+const attest = (rt, jobId) => rt.passGate({jobId,name:'caller_attestation',evidence:'Caller reviewed isolated test result'});
 const wait = async (check, timeout = 12000) => {
   const start = Date.now();
   for (;;) {
@@ -122,6 +123,9 @@ test('auto recovery never accepts a command with unproven side effects', () => {
     const taskId = f.rt.accept({key:'policy',title:'Policy'}).task.id;
     assert.throws(() => f.rt.submit({taskId,key:'write',command:command(),resume:'auto_safe'}), /READ_ONLY/);
     assert.throws(() => f.rt.submit({taskId,key:'gates',command:command(),gates:['process_exit_zero']}), /GATES_INVALID/);
+    assert.throws(() => f.rt.submit({taskId,key:'reserved',command:command(),gates:['caller_attestation']}), /GATES_INVALID/);
+    assert.throws(() => f.rt.submit({taskId,key:'unsupported',command:command(),completionMode:'verified'}), /COMPLETION_MODE_INVALID/);
+    assert.throws(() => f.rt.submit({taskId,key:'mixed',command:command(),completionMode:'exit_only',gates:['readback']}), /EXIT_ONLY_DISALLOWS_CUSTOM_GATES/);
   } finally {f.cleanup();}
 });
 
@@ -165,7 +169,7 @@ test('detached worker produces a real completion candidate; gates require eviden
     assert.equal(logs.length,1);
     assert.match(fs.readFileSync(path.join(f.root,'.arl','logs',logs[0]),'utf8'), /child-ran/);
     f.rt.passGate({jobId,name:'readback',evidence:'external output file contents checked'});
-    assert.equal(f.rt.complete({jobId}).job.state, 'completed');
+    assert.equal(f.rt.complete({jobId}).job.completionBasis, 'caller_attested');
     assert.equal(f.rt.status({taskId}).task.state, 'completed');
     assert.equal(f.rt.complete({jobId}).deduplicated, true);
   } finally {f.cleanup();}
@@ -181,9 +185,11 @@ test('resource conflict blocks concurrent jobs and releases on completion', asyn
     assert.throws(() => f.rt.start({jobId:j2}), /RESOURCE_BUSY/);
     await wait(() => f.rt.status({jobId:j1}).job.state === 'completion_candidate');
     assert.throws(() => f.rt.start({jobId:j2}), /RESOURCE_BUSY/);
+    attest(f.rt,j1);
     f.rt.complete({jobId:j1});
     f.rt.start({jobId:j2});
     await wait(() => f.rt.status({jobId:j2}).job.state === 'completion_candidate');
+    attest(f.rt,j2);
     f.rt.complete({jobId:j2});
     assert.equal(f.rt.status({taskId}).task.state,'completed');
   } finally {f.cleanup();}
@@ -198,6 +204,7 @@ test('unverified effects block completion even after a successful OS exit', asyn
     await wait(() => ['running','completion_candidate'].includes(f.rt.status({jobId}).job.state));
     f.rt.beginOperation({jobId,key:'remote-write'});
     await wait(() => f.rt.status({jobId}).job.state==='completion_candidate');
+    attest(f.rt,jobId);
     assert.throws(()=>f.rt.complete({jobId}), /OPERATION_RECONCILIATION_REQUIRED/);
     f.rt.settleOperation({jobId,key:'remote-write',outcome:'aborted',evidence:'target inspected; write not applied'});
     assert.equal(f.rt.complete({jobId}).job.state,'completed');
@@ -368,6 +375,7 @@ test('recovery blocks uncertain lost workers; safe read-only jobs can resume', a
     assert.equal(result.restarted.length,1);
     await wait(() => f.rt.status({jobId:safe}).job.state==='completion_candidate');
     assert.equal(f.rt.status({jobId:safe}).job.attempts.length,2);
+    attest(f.rt,safe);
     f.rt.complete({jobId:safe});
   } finally {f.cleanup();}
 });
@@ -464,6 +472,7 @@ test('concurrent CLI invocations share one task and one worker attempt', async (
     assert.equal([one.alreadyRunning,two.alreadyRunning].filter(Boolean).length,1);
     await wait(() => f.rt.status({jobId}).job.state==='completion_candidate');
     assert.equal(f.rt.status({jobId}).job.attempts.length,1);
+    attest(f.rt,jobId);
     f.rt.complete({jobId});
   } finally {f.cleanup();}
 });
@@ -478,6 +487,7 @@ test('a failed execution releases its resource reservation', async () => {
     await wait(()=>f.rt.status({jobId:bad}).job.state==='failed');
     assert.equal(f.rt.start({jobId:good}).alreadyRunning,false);
     await wait(()=>f.rt.status({jobId:good}).job.state==='completion_candidate');
+    attest(f.rt,good);
     f.rt.complete({jobId:good});
   } finally {f.cleanup();}
 });
@@ -496,6 +506,7 @@ test('a failed job with an uncertain operation retains resources until reconcili
     f.rt.settleOperation({jobId:bad,key:'external-write',outcome:'confirmed',evidence:'external destination readback'});
     assert.equal(f.rt.start({jobId:good}).alreadyRunning,false);
     await wait(()=>f.rt.status({jobId:good}).job.state==='completion_candidate');
+    attest(f.rt,good);
     f.rt.complete({jobId:good});
   } finally {f.cleanup();}
 });
@@ -607,6 +618,7 @@ test('process survives a CLI invocation and status can be read in a new process'
     const status = spawnSync(process.execPath,[cli,'status','--root',f.root,'--job',jobId],{encoding:'utf8',timeout:5000,windowsHide:true});
     assert.equal(status.status,0,status.stderr);
     assert.equal(JSON.parse(status.stdout).job.attempts[0].exitCode,0);
+    attest(f.rt,jobId);
     f.rt.complete({jobId});
   } finally {f.cleanup();}
 });

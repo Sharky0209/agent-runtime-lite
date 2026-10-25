@@ -7,11 +7,11 @@
 
 **Your agent's CLI session ended. Did its task actually finish?**
 
-Agent Runtime Lite keeps a local task record across separate CLI invocations, launches a detached child process, and distinguishes a successful command exit from a **verified** result. When you configure an additional completion gate, a caller must inspect the real output and submit evidence before the job can be marked done.
+Agent Runtime Lite keeps a local task record across separate CLI invocations, launches a detached child process, and distinguishes successful command exit from **caller-attested completion**. In v0.2, every new job requires caller-supplied completion evidence by default. If no custom gates were configured, the runtime adds a mandatory `caller_attestation` gate; existing custom evidence gates fulfill the requirement without an extra duplicate step.
 
 It is a dependency-free Node.js runner for single-host workflows—not an AI model host, a distributed queue, or automatic proof of external business outcomes.
 
-**v0.1.4 verification limitation:** Additional readback gates are currently optional. With no added gate, a child exiting with code 0 satisfies the built-in process gate and the caller may mark its job complete **without verifying the intended artifact**. Submitted gate evidence is a caller assertion, not independently verified by the library. This default is under review in [issue #13](https://github.com/Sharky0209/agent-runtime-lite/issues/13).
+**Important distinction:** `caller_attestation` is a statement supplied by the caller; the library does **not** independently verify external file contents or business outcomes. New jobs can explicitly use `completionMode: 'exit_only'` when OS exit code is sufficient; their completion is labeled `process_exit_only`, not attested. Previously saved v0.1.x jobs retain their original gates. See the [v0.2 migration guide](docs/MIGRATION_V02.md).
 
 ### See the handoff in about a minute
 
@@ -35,7 +35,7 @@ The original CLI process did not need to remain open.
 
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
-Version 0.1.4 · MIT licensed · Built for single-host, recoverable agent workflows.
+Version 0.2.0-beta.1 · MIT licensed · Built for single-host, recoverable agent workflows.
 
 ## Try the public preview (no source checkout)
 
@@ -43,7 +43,7 @@ From a new, empty directory with Node.js 20+ and npm:
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.4/agent-runtime-lite-0.1.4.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.1/agent-runtime-lite-0.2.0-beta.1.tgz
 npm exec -- arl --version
 npm exec -- arl --help
 ```

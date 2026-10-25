@@ -6,9 +6,9 @@
 
 **Agent 的 CLI 会话结束了，任务真的完成了吗？**
 
-Agent Runtime Lite 让任务状态能被后续独立 CLI 进程接手：启动真实后台子进程、保留任务记录，命令退出成功后先进入待验收状态，配置附加验收门槛后，需由调用方核实实际输出并提交证据，才能完成任务。它是零第三方 npm 依赖的**单机任务运行框架**，不是模型服务或分布式任务队列，也不会自动证明第三方业务结果。
+Agent Runtime Lite 让任务状态能被后续独立 CLI 进程接手：启动真实后台子进程、保留任务记录，命令退出成功后先进入待验收状态，从 v0.2 起，新任务默认必须提交调用方验收证据才能完成：没有自定义 gate 时自动加入 `caller_attestation`；已经指定实际验收 gate 时直接使用该 gate，不要求重复确认。它是零第三方 npm 依赖的**单机任务运行框架**，不是模型服务或分布式任务队列，也不会自动证明第三方业务结果。
 
-**v0.1.4 重要限制：** 额外的读回验收门槛目前是可选项；如果没有配置附加 gate，子进程退出码为 0 后，调用方可以直接把 Job 标记完成，**不要求核对交付物**。即使配置了 gate，证据仍由调用方提供，库本身不会独立证明外部操作已完成。默认强制验收的设计整改记录见 [Issue #13](https://github.com/Sharky0209/agent-runtime-lite/issues/13)。
+**注意能力边界：** `caller_attestation` 的证据是调用方声明，并不代表本库能自行核实第三方系统。仅按退出码判断的任务必须显式选择 `completionMode: 'exit_only'`（CLI：`--completion-mode exit_only`），完成时标记为 `process_exit_only`。已经落盘的 v0.1.x 任务保留旧验收规则。请看 [v0.2 升级指南](docs/MIGRATION_V02.md)。
 
 ### 一分钟看懂实际效果
 
@@ -30,7 +30,7 @@ The original CLI process did not need to remain open.
 
 **真实文件示例：** 执行 `node examples/report-file-handoff.mjs`，后台进程会生成 `report.json`，后续独立 CLI 进程读回文件并校验汇总值，通过后才允许完成任务。只需要 Node.js 20+，不依赖 npm Registry 服务。
 
-**版本：v0.1.4，MIT 许可证，面向单机任务运行场景。**
+**版本：v0.2.0-beta.1，MIT 许可证，面向单机任务运行场景。**
 
 ## 不克隆源码，直接安装体验
 
@@ -38,7 +38,7 @@ The original CLI process did not need to remain open.
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.4/agent-runtime-lite-0.1.4.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.1/agent-runtime-lite-0.2.0-beta.1.tgz
 npm exec -- arl --version
 npm exec -- arl --help
 ```
@@ -54,6 +54,12 @@ npm exec -- arl --help
 - **外部副作用登记**：先记录操作，再执行外部动作；超时或结果不明确时必须核对真实目标，不能自动重复。
 - **资源互斥**：两个 Job 不会并发使用同一声明的资源。
 - **可控重试**：默认人工核对后续跑，明确只读的任务可以选择安全自动恢复。
+
+## 默认验收与可选退出码模式
+
+- **默认 `attested`**：需要内置进程退出检查和至少一项调用方证据。没有自定义 gate 时要求 `caller_attestation`；指定了自定义 gate 时需全部通过，不重复增加确认。
+- **显式 `exit_only`**：只依赖退出码；不能声明其他自定义 gate，结果仅表示进程成功退出。
+- **迁移注意**：旧任务不自动添加新 gate；相同幂等 Key 如果与新模式冲突，会拒绝新提交，而不是悄悄复用旧语义。
 
 ## 安全诊断
 

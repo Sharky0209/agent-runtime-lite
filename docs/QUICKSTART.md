@@ -10,7 +10,7 @@ For a new empty local project (Node.js 20+):
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.4/agent-runtime-lite-0.1.4.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.2.0-beta.1/agent-runtime-lite-0.2.0-beta.1.tgz
 npm exec -- arl --version
 npm exec -- arl --help
 ```
@@ -91,5 +91,7 @@ In `command.json`, put the command you actually intend to run:
 ```
 
 Use the returned `task.id` and `job.id` as `TASK_ID` and `JOB_ID`. Wait for `completion_candidate` and inspect the real result **before** calling `gate`. A successful process exit is not proof an arbitrary external business action happened.
+
+A new job defaults to mandatory caller evidence: if you omit `--gate`, the required gate is named `caller_attestation`; if you use `--gate`, that custom evidence gate is sufficient and there is no duplicate attestation step. To intentionally use exit-code-only semantics, supply `--completion-mode exit_only` and no custom gates; results are **unverified**. Old stored jobs preserve old gates; see [v0.2 migration](MIGRATION_V02.md).
 
 See [architecture](ARCHITECTURE.md), [maintenance](MAINTENANCE.md), and [contributing](../CONTRIBUTING.md).

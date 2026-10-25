@@ -15,11 +15,11 @@ Agent Runtime Lite is a local, single-host task runner that stores durable state
 ## Typical lifecycle
 
 1. The caller accepts a task using a stable key.
-2. The caller submits a named job with a command, optional resource reservations, and any additional completion gates.
+2. The caller submits a named job with a command, optional resource reservations, and optional extra completion gates. **New jobs default to `attested` mode** with at least one mandatory caller-evidence gate (`caller_attestation` is inserted only if no custom gates were supplied); opt-out to `exit_only` must be explicit.
 3. `start()` reserves named resources and starts a detached Node.js worker.
 4. The worker records attempt process details, runs the configured command, and stores the exit result.
-5. Exit code zero establishes only a completion **candidate**. If additional gates are configured, the caller must check business output and pass those gates; without extra gates, the caller can complete after exit code zero without external readback (v0.1.4 limitation; see issue #13).
-6. `complete()` verifies that all gates are passed and there are no uncertain external operations. The task's derived status then reflects its required jobs.
+5. Exit code zero establishes only a completion **candidate**. In default `attested` mode, the caller inspects business output and passes the required custom evidence gates, or the automatically inserted `caller_attestation` if no custom gates exist. The runtime does not validate that the caller's evidence is truthful.
+6. `complete()` verifies all gates, enforces the mandatory attestation gate even if it is missing from a modified state, and refuses unresolved external operations. Results record `completionBasis`: `caller_attested` or explicit `process_exit_only`. Previously persisted v0.1.x jobs keep their stored requirements and are labeled with a `legacy_*` completion basis. The task's derived status then reflects its required jobs.
 
 The state is persisted as an atomic JSON snapshot and synchronized with a local lock. The approach is deliberately simple and works best with small to medium local agent workloads.
 
