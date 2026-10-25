@@ -329,6 +329,12 @@ test('actual worker crash after spawn but before PID persistence never auto-repl
     if (faultWorkerPid && processAlive(faultWorkerPid)) {
       try {process.kill(faultWorkerPid);} catch {}
     }
+    // Windows can hold a log/directory handle briefly after a kill signal.
+    // Wait for actual process exit before removing the fixture directory.
+    if (process.platform === 'win32') {
+      await wait(() => (!spawnedChildPid || !processAlive(spawnedChildPid)) &&
+        (!faultWorkerPid || !processAlive(faultWorkerPid)), 10000);
+    }
     f.cleanup();
   }
 });
@@ -442,6 +448,12 @@ test('killing a real worker with an uncertain operation never auto-replays', asy
   } finally {
     if (childPid && processAlive(childPid)) { try { process.kill(childPid); } catch {} }
     if (workerPid && processAlive(workerPid)) { try { process.kill(workerPid); } catch {} }
+    // Waiting for the actual Windows child/worker exit prevents intermittent
+    // EBUSY on temp cleanup, without weakening the live-process recovery guard.
+    if (process.platform === 'win32') {
+      await wait(() => (!childPid || !processAlive(childPid)) &&
+        (!workerPid || !processAlive(workerPid)), 10000);
+    }
     f.cleanup();
   }
 });
