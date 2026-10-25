@@ -71,7 +71,8 @@ jobs:
             });'
       - name: Verify-only mode; no publication
         if: ${{ inputs.mode == 'validate' }}
-        run: echo "VALIDATE_ONLY_PASS: no credentials used, no npm publish"
+        run: |
+          echo 'VALIDATE_ONLY_PASS: no credentials used, no npm publish'
       - name: Publish explicit npm beta (opt-in)
         if: ${{ inputs.mode == 'publish' }}
         shell: bash
