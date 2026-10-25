@@ -1,4 +1,4 @@
-# First-user launch kit (v0.1.2)
+# First-user launch kit (v0.1.3)
 
 This is copy for outreach, not evidence that any third-party adoption or community posting happened. Update the install line to `npm install agent-runtime-lite` only after a live registry readback and a clean consumer installation confirm the npm publication.
 

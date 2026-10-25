@@ -33,7 +33,7 @@ The original CLI process did not need to remain open.
 
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
-Version 0.1.2 · MIT licensed · Built for single-host, recoverable agent workflows.
+Version 0.1.3 · MIT licensed · Built for single-host, recoverable agent workflows.
 
 ## Try the public preview (no source checkout)
 
@@ -41,7 +41,7 @@ From a new, empty directory with Node.js 20+ and npm:
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.2/agent-runtime-lite-0.1.2.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.3/agent-runtime-lite-0.1.3.tgz
 npm exec -- arl --version
 npm exec -- arl --help
 ```
