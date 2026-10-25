@@ -2,7 +2,7 @@
 
 [![跨平台测试](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 
-[5 分钟入门](docs/QUICKSTART.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [更新记录](CHANGELOG.md)
+[5 分钟入门](docs/QUICKSTART.md) · [排障与诊断](docs/TROUBLESHOOTING.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [更新记录](CHANGELOG.md)
 
 **Agent 的 CLI 会话结束了，任务真的完成了吗？**
 
@@ -28,7 +28,7 @@ The original CLI process did not need to remain open.
 
 **真实文件示例：** 执行 `node examples/report-file-handoff.mjs`，后台进程会生成 `report.json`，后续独立 CLI 进程读回文件并校验汇总值，通过后才允许完成任务。只需要 Node.js 20+，不依赖 npm Registry 服务。
 
-**版本：v0.1.3，MIT 许可证，面向单机任务运行场景。**
+**版本：v0.1.4，MIT 许可证，面向单机任务运行场景。**
 
 ## 不克隆源码，直接安装体验
 
@@ -36,7 +36,7 @@ The original CLI process did not need to remain open.
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.3/agent-runtime-lite-0.1.3.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.4/agent-runtime-lite-0.1.4.tgz
 npm exec -- arl --version
 npm exec -- arl --help
 ```
@@ -52,6 +52,10 @@ npm exec -- arl --help
 - **外部副作用登记**：先记录操作，再执行外部动作；超时或结果不明确时必须核对真实目标，不能自动重复。
 - **资源互斥**：两个 Job 不会并发使用同一声明的资源。
 - **可控重试**：默认人工核对后续跑，明确只读的任务可以选择安全自动恢复。
+
+## 安全诊断
+
+`arl doctor --root ./my-workspace`（或在源码目录执行 `node bin/arl.mjs doctor --root ./my-workspace`）只读取工作区状态，汇总任务、资源占用、待核对操作与疑似异常 Worker 数量，不会启动任务或修改记录；输出不包含任务标题、命令参数、绝对路径、客户数据或验收证据。完整的 `arl status` 可能包含敏感参数和证据，不建议直接贴到公开 Issue。参见[排障指南](docs/TROUBLESHOOTING.md)。
 
 ## 运行
 

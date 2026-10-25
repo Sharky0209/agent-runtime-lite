@@ -1,4 +1,5 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -32,6 +33,10 @@ const commandShape = (command) => {
 const checkJob = (state, jobId) => state.jobs[jobId] || fail('JOB_NOT_FOUND');
 const checkTask = (state, taskId) => state.tasks[taskId] || fail('TASK_NOT_FOUND');
 const touch = (row) => { row.updatedAt = iso(); return row; };
+const safeBlockCode = (reason) => {
+  const code = String(reason || '').split(':', 1)[0];
+  return /^(CHILD_DISPATCH_UNCERTAIN|CHILD_STILL_ALIVE|WORKER_HEARTBEAT_STALE|WORKER_LOST|OPERATION_RECONCILIATION_REQUIRED|PROCESS_TIMEOUT|PROCESS_EXIT|WORKER_LAUNCH_FAILED)$/.test(code) ? code : 'OTHER';
+};
 
 export function deriveTask(task, jobs) {
   if (task.cancelledAt) return 'cancelled';
@@ -110,6 +115,60 @@ export class Runtime {
       const jobs = Object.values(state.jobs).filter(j => j.taskId === task.id);
       return {...copy(task), state: deriveTask(task, jobs)};
     }), jobs: copy(Object.values(state.jobs))};
+  }
+  diagnose() {
+    // Only aggregated metadata: no command arguments, paths, user keys,
+    // operation evidence, job identifiers or customer content.
+    let state;
+    try { state = this.store.read(); }
+    catch { throw Error('DOCTOR_STATE_UNREADABLE'); }
+    const jobs = Object.values(state.jobs);
+    const jobsByState = {};
+    const blockedReasons = {};
+    let attempts = 0;
+    let unresolvedOperations = 0;
+    let uncertainDispatches = 0;
+    let staleWorkerHeartbeats = 0;
+    let missingWorkers = 0;
+    for (const job of jobs) {
+      const jobState = ['queued','launching','running','completion_candidate',
+        'blocked','failed','completed','cancelled'].includes(job.state) ? job.state : 'other';
+      jobsByState[jobState] = (jobsByState[jobState] || 0) + 1;
+      attempts += job.attempts.length;
+      unresolvedOperations += job.operations.filter(op => op.state === 'uncertain').length;
+      if (childDispatchUncertain(job)) uncertainDispatches++;
+      if (jobState === 'blocked' || jobState === 'failed') {
+        const reason = safeBlockCode(job.blockReason);
+        blockedReasons[reason] = (blockedReasons[reason] || 0) + 1;
+      }
+      if (jobState === 'launching' || jobState === 'running') {
+        const attempt = job.attempts.at(-1);
+        const workerAlive = processAlive(attempt?.workerPid) || processAlive(attempt?.launcherPid);
+        if (workerAlive && workerHeartbeatStale(attempt)) staleWorkerHeartbeats++;
+        else if (!workerAlive) missingWorkers++;
+      }
+    }
+    let stateFileBytes = 0;
+    try { stateFileBytes = fs.statSync(this.store.file).size; }
+    catch (error) { if (error.code !== 'ENOENT') throw Error('DOCTOR_STATE_STAT_FAILED'); }
+    return {
+      format: 'arl-doctor-v1',
+      initialized: stateFileBytes > 0,
+      stateFileBytes,
+      counts: {
+        tasks: Object.keys(state.tasks).length,
+        jobs: jobs.length,
+        attempts,
+        reservedResources: Object.keys(state.resources).length,
+        unresolvedOperations,
+        uncertainDispatches,
+        staleWorkerHeartbeats,
+        missingWorkers
+      },
+      jobsByState,
+      blockedReasons,
+      guidance: 'Read-only summary. Inspect details locally with arl status; call arl recover only after reviewing possible external effects.'
+    };
   }
   checkpoint({taskId, step, note = ''}) {
     if (!step) fail('CHECKPOINT_STEP_REQUIRED');

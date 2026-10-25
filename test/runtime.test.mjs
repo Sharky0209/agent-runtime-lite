@@ -52,6 +52,70 @@ test('job submission deduplicates and conflicts on changed command', () => {
   } finally {f.cleanup();}
 });
 
+test('doctor is read-only and never discloses commands, IDs, paths or evidence', () => {
+  const f = make();
+  try {
+    const empty = f.rt.diagnose();
+    assert.equal(empty.initialized,false);
+    assert.equal(fs.existsSync(path.join(f.root,'.arl')),false,'doctor does not create state');
+    const taskId = f.rt.accept({key:'PRIVATE-TASK-KEY',title:'PRIVATE-TITLE'}).task.id;
+    const jobId = f.rt.submit({
+      taskId,key:'PRIVATE-JOB-KEY',
+      command:command('console.log("PRIVATE-COMMAND")'),
+      resources:['PRIVATE-RESOURCE']
+    }).job.id;
+    f.rt.store.update(state => {
+      const job = state.jobs[jobId];
+      job.state = 'blocked';
+      job.blockReason = 'PROCESS_EXIT:PRIVATE-ERROR-TEXT';
+      job.attempts = [{id:'PRIVATE-ATTEMPT-ID'}];
+      job.operations.push({
+        key:'PRIVATE-OPERATION',state:'uncertain',evidence:'PRIVATE-EVIDENCE'
+      });
+      state.resources['PRIVATE-RESOURCE'] = jobId;
+    });
+    const snapshot = fs.readFileSync(path.join(f.root,'.arl','state.json'),'utf8');
+    const diagnosed = f.rt.diagnose();
+    const visible = JSON.stringify(diagnosed);
+    assert.equal(diagnosed.initialized,true);
+    assert.equal(diagnosed.counts.tasks,1);
+    assert.equal(diagnosed.counts.jobs,1);
+    assert.equal(diagnosed.counts.attempts,1);
+    assert.equal(diagnosed.counts.reservedResources,1);
+    assert.equal(diagnosed.counts.unresolvedOperations,1);
+    assert.equal(diagnosed.jobsByState.blocked,1);
+    assert.equal(diagnosed.blockedReasons.PROCESS_EXIT,1);
+    for (const secret of ['PRIVATE','arl-test-',jobId,taskId,f.root])
+      assert.equal(visible.includes(secret),false,'doctor leaked '+secret);
+    assert.equal(fs.readFileSync(path.join(f.root,'.arl','state.json'),'utf8'),snapshot);
+  } finally {f.cleanup();}
+});
+
+test('doctor does not echo private content from a corrupted state file', () => {
+  const f = make();
+  try {
+    const taskId = f.rt.accept({key:'private-diagnostic',title:'private'}).task.id;
+    assert.ok(taskId);
+    fs.writeFileSync(path.join(f.root,'.arl','state.json'),
+      '{"PRIVATE_STATE_SECRET_123": invalid json');
+    assert.throws(() => f.rt.diagnose(), error =>
+      error.message === 'DOCTOR_STATE_UNREADABLE');
+  } finally {f.cleanup();}
+});
+
+test('EPERM during process probing means alive, not safe to replay', () => {
+  const originalKill = process.kill;
+  try {
+    process.kill = () => {const error=new Error('operation not permitted');error.code='EPERM';throw error;};
+    assert.equal(processAlive(12345),true);
+    process.kill = () => {const error=new Error('access denied');error.code='EACCES';throw error;};
+    assert.equal(processAlive(12345),true);
+    process.kill = () => {const error=new Error('no such process');error.code='ESRCH';throw error;};
+    assert.equal(processAlive(12345),false);
+    assert.equal(processAlive(0),false);
+  } finally {process.kill = originalKill;}
+});
+
 test('auto recovery never accepts a command with unproven side effects', () => {
   const f = make();
   try {

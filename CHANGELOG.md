@@ -4,6 +4,12 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-26
+
+- Add a read-only, privacy-preserving `arl doctor` for aggregate workspace diagnostics and safe public bug reporting.
+- Treat permission-denied process probes as potentially live, preventing unsafe duplicate execution.
+- Verify minimum-supported Node.js 20 on Linux in CI alongside the existing Node.js 22 platform matrix.
+
 ## [0.1.3] - 2026-10-26
 
 - Stabilize the explicit-retry regression by waiting for worker and child exit before retry; production safety checks remain unchanged.

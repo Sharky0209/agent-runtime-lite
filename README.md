@@ -3,7 +3,7 @@
 [![Cross-platform tests](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[5-minute quickstart](docs/QUICKSTART.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Changelog](CHANGELOG.md)
+[5-minute quickstart](docs/QUICKSTART.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Changelog](CHANGELOG.md)
 
 **Your agent's CLI session ended. Did its task actually finish?**
 
@@ -33,7 +33,7 @@ The original CLI process did not need to remain open.
 
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
-Version 0.1.3 · MIT licensed · Built for single-host, recoverable agent workflows.
+Version 0.1.4 · MIT licensed · Built for single-host, recoverable agent workflows.
 
 ## Try the public preview (no source checkout)
 
@@ -41,7 +41,7 @@ From a new, empty directory with Node.js 20+ and npm:
 
 ```sh
 npm init -y
-npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.3/agent-runtime-lite-0.1.3.tgz
+npm install --save-dev https://github.com/Sharky0209/agent-runtime-lite/releases/download/v0.1.4/agent-runtime-lite-0.1.4.tgz
 npm exec -- arl --version
 npm exec -- arl --help
 ```
@@ -130,6 +130,10 @@ r.settleOperation({jobId, key: 'publish-1', outcome: 'confirmed', evidence: 'Tar
 ```
 
 The library does not send external requests itself and cannot certify evidence automatically. You provide the external implementation and truthful readback. An uncertain operation prevents final completion and prevents an unsafe retry.
+
+## Diagnosing a workspace
+
+Use `arl doctor --root ./my-workspace` (or `node bin/arl.mjs doctor --root ./my-workspace` from a source checkout) to inspect a **read-only, share-safe aggregate** of job states, resources, uncertain operations, and potential stale workers. The output excludes command arguments, task titles, job IDs, local paths and private verification evidence. It does not repair state or start a process; see [troubleshooting](docs/TROUBLESHOOTING.md) for safe next steps. Use `status` only locally because full status includes command details and evidence.
 
 ## Recovery and retry
 
