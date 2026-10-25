@@ -4,6 +4,7 @@
 
 | Version | Security fixes |
 | --- | --- |
+| 0.2.x beta previews | Best-effort maintenance |
 | 0.1.x previews | Best-effort maintenance |
 | Earlier versions | Not supported |
 

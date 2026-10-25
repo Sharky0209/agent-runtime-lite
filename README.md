@@ -3,7 +3,7 @@
 [![Cross-platform tests](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[5-minute quickstart](docs/QUICKSTART.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Independent trial kit](docs/LAUNCH.md) · [Changelog](CHANGELOG.md)
+[5-minute quickstart](docs/QUICKSTART.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Independent trial kit](docs/LAUNCH.md) · [npm beta publishing](docs/NPM_PUBLISHING.md) · [Changelog](CHANGELOG.md)
 
 **Your agent's CLI session ended. Did its task actually finish?**
 

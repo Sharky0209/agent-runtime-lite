@@ -1,41 +1,90 @@
-name: Publish to npm (manual; tagged source only)
+name: Verify npm release (manual, publish opt-in)
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'validate is safe and never publishes; publish requires npm authorization'
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - publish
 
 permissions:
   contents: read
+  # Provenance, and future npm trusted publishing, require a scoped OIDC token.
+  id-token: write
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: v0.2.0-beta.2
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           registry-url: https://registry.npmjs.org
-      - name: Verify tagged package and registry status
+          package-manager-cache: false
+      - name: Check immutable beta tag and npm environment
         shell: bash
         run: |
-          node -e "const p=require('./package.json'); if(p.name!=='agent-runtime-lite'||p.version!=='0.2.0-beta.2'){console.error('unexpected package',p.name,p.version); process.exit(1)} console.log(p.name+'@'+p.version)"
-          if lookup="$(npm view agent-runtime-lite@0.2.0-beta.2 version 2>&1)"; then
-            echo "ALREADY PUBLISHED - aborting"
+          set -euo pipefail
+          node -e "const p=require('./package.json');if(p.name!=='agent-runtime-lite'||p.version!=='0.2.0-beta.2'||p.license!=='MIT'||p.repository.url!=='git+https://github.com/Sharky0209/agent-runtime-lite.git'){process.exit(1)}"
+          echo "Package: agent-runtime-lite@0.2.0-beta.2"
+          echo "Node: $(node --version); npm: $(npm --version)"
+          node -e "const [major,minor]=process.versions.node.split('.').map(Number);if(major<24)process.exit(1)"
+          # Do not accidentally re-publish an existing immutable npm version.
+          if lookup="$(npm view agent-runtime-lite@0.2.0-beta.2 version --registry=https://registry.npmjs.org 2>&1)"; then
+            echo "VERSION_ALREADY_PUBLISHED: $lookup"
             exit 1
           fi
           if [[ "$lookup" != *"E404"* ]]; then
-            echo "Registry lookup failed for a reason other than package absence:"
-            echo "$lookup"
+            echo "NPM_LOOKUP_ERROR_NOT_404"
             exit 1
           fi
-          echo "Package version not published yet"
+          echo "Registry confirms this version is currently absent"
       - name: Test tagged source
         run: npm test
       - name: Test packaged CLI
         run: npm run test:package
-      - name: Publish
-        run: npm publish --access public
+      - name: Inspect package files before release
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json | node -e '
+            let input = "";
+            process.stdin.on("data", value => input += value);
+            process.stdin.on("end", () => {
+              const [p] = JSON.parse(input);
+              const files = p.files.map(x => x.path);
+              for (const required of ["LICENSE", "README.md", "bin/arl.mjs", "src/runtime.mjs"]) {
+                if (!files.includes(required)) throw Error("PACK_FILE_MISSING_" + required);
+              }
+              const forbidden = files.filter(x => /(^|\/)(\.npmrc|\.env(?:\..*)?|\.arl|node_modules|\.github)(\/|$)/i.test(x));
+              if (forbidden.length) throw Error("PRIVATE_FILE_IN_PACK:" + forbidden.join(","));
+              console.log("PACKAGE_FILE_AUDIT_PASS", p.name, p.version, files.length, "files");
+            });'
+      - name: Verify-only mode; no publication
+        if: ${{ inputs.mode == 'validate' }}
+        run: echo "VALIDATE_ONLY_PASS: no credentials used, no npm publish"
+      - name: Publish explicit npm beta (opt-in)
+        if: ${{ inputs.mode == 'publish' }}
+        shell: bash
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Initial publication needs an npm account or a configured publisher.
+          # We do not infer publication authorization from GitHub repository access.
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "No npm token configured; attempting only already-configured npm trusted publishing (OIDC)."
+            echo "For initial publication, authenticate the npm account first; see docs/NPM_PUBLISHING.md."
+          fi
+          npm publish --access public --tag beta --provenance --ignore-scripts
+          npm view agent-runtime-lite@0.2.0-beta.2 version --registry=https://registry.npmjs.org
+          echo "NPM_BETA_PUBLISH_AND_READBACK_PASS"
