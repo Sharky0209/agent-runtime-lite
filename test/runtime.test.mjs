@@ -150,6 +150,10 @@ test('nonzero child exit records failure and allows an explicit retry', async ()
     assert.equal(f.rt.status({taskId}).task.state, 'blocked');
     assert.equal(f.rt.status({jobId}).job.attempts[0].exitCode,7);
     assert.throws(() => f.rt.complete({jobId}), /JOB_NOT_COMPLETION_CANDIDATE/);
+    // The failure state is written just before the worker process exits.
+    // Preserve the production process-alive guard; wait for actual exit in this test.
+    const attempt = f.rt.status({jobId}).job.attempts.at(-1);
+    await wait(() => !processAlive(attempt.workerPid) && !processAlive(attempt.childPid));
     assert.equal(f.rt.retry({jobId}).state,'queued');
   } finally {f.cleanup();}
 });
