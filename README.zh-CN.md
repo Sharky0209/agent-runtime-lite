@@ -2,7 +2,7 @@
 
 [![跨平台测试](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 
-[5 分钟入门](docs/QUICKSTART.md) · [排障与诊断](docs/TROUBLESHOOTING.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [外部试用与反馈](docs/LAUNCH.md) · [更新记录](CHANGELOG.md)
+[5 分钟入门](docs/QUICKSTART.md) · [排障与诊断](docs/TROUBLESHOOTING.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [外部试用与反馈](docs/LAUNCH.md) · [npm 预览版发布流程](docs/NPM_PUBLISHING.md) · [更新记录](CHANGELOG.md)
 
 **Agent 的 CLI 会话结束了，任务真的完成了吗？**
 

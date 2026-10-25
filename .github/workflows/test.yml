@@ -16,10 +16,13 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
+          package-manager-cache: false
       - name: Run unit and process integration tests
         run: npm test
       - name: Run independent example
@@ -41,10 +44,13 @@ jobs:
     name: Node 20 / ubuntu-latest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
+          package-manager-cache: false
       - name: Verify minimum supported Node release
         run: npm test
       - name: Verify independent packaged consumer
