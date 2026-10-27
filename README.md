@@ -113,6 +113,34 @@ Use `arl drive --root ./trial-workspace --task TASK_ID --wait-ms 10000` to conti
 
 The feature is currently on the repository source branch; it is **not** in the immutable `v0.2.0-beta.2` Release archive.
 
+## Safe Chat-mode continuation guard (new, unreleased)
+
+`ChatContinuationGuard` is an **opt-in, host-driven** monitor for an already identified ChatGPT turn. It records real progress markers separately from routine polling, reports a **suspected stall** after the configured interval, and can reserve **one continuation message** after an independent provider readback confirms that **the exact current turn has definitively failed, timed out, or been interrupted**. A long-running active thinking turn is never automatically interrupted merely for being silent.
+
+For local monitoring, register a task first using `arl accept`, then:
+
+```sh
+node bin/arl.mjs chat-watch --root ./state --task TASK_ID --conversation PINNED_CID --turn TURN_ID --message-file ./continue.txt --stall-ms 120000
+node bin/arl.mjs chat-observe --root ./state --task TASK_ID --conversation PINNED_CID --turn TURN_ID --sequence 1 --state active --progress-key stream-1
+node bin/arl.mjs chat-plan --root ./state --task TASK_ID --conversation PINNED_CID --turn TURN_ID
+```
+
+**Actual chat submission requires an explicitly supplied adapter in your host program**, for example:
+
+```js
+import {ChatContinuationGuard} from 'agent-runtime-lite';
+const guard = new ChatContinuationGuard('./state');
+const keys = {taskId, conversationId, turnId};
+const result = await guard.tick(keys, chatAdapter);
+const delivery = await guard.reconcile(keys, chatAdapter);
+```
+
+The adapter contract is `readTurn({conversationId,turnId})`, `sendContinuation({conversationId,turnId,expectedHeadId,operationKey,message})`, and `readDelivery({conversationId,turnId,operationKey,receipt})`. To enable sending, it must explicitly attest `capabilities.atomicHeadCheck === true` **and** `capabilities.durableIdempotency === true`; these are *real provider guarantees*, not flags to bypass. `readTurn` must verify the pinned conversation/turn, an exact current head ID, `headMatches:true`, `hasNewerMessages:false`, and a terminal `status` (`failed`, `timed_out`, or `interrupted`). The adapter must reject a send if the head has changed at the actual dispatch boundary, and must deduplicate `operationKey` across crashes. A local web UI scraper with only read-then-click behavior does **not** meet this contract.
+
+Before external send, the guard durably reserves the operation key. Accepted submissions remain `submitted_unverified` until independently confirmed with `readDelivery`; crashes, network timeouts and ambiguous receipts remain uncertain **without blind resending**. Default limits are two continuation attempts per task, one per source turn. A new source turn must be explicitly registered; there is no endless autonomous conversation loop. Use host scheduling/observations to invoke `tick` again; this library does not continuously watch ChatGPT or start background services.
+
+**Current scope:** the state machine, idempotency and negative cases are tested with simulated providers, **not** against a real ChatGPT Chat account. The project does not include a built-in authorized ChatGPT adapter and cannot spontaneously send a new user turn from inside an ordinary ChatGPT chat. Your existing authenticated transport, verified current conversation/turn ID, explicit send permission, and authoritative provider readback are required. Until those guarantees are independently verified, this guard only detects and reports suspected stalls; it does not automatically send. Do not store secrets in the continuation message.
+
 ## Multi-step workflows (new, unreleased)
 
 Submit jobs in dependency order using keys within the **same task**. `dependsOn` is persisted and immutable for idempotent submissions; forward references and circular graphs are rejected by requiring each predecessor to exist first. Existing jobs without dependencies continue to work.

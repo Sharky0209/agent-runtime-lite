@@ -59,8 +59,8 @@ try{
   assert.equal(missing.status,1);
   assert.match(missing.stderr,/MISSING --key/);
   const exported=run(process.execPath,['--input-type=module','-e',
-    'import {Runtime,runFlow} from "agent-runtime-lite"; console.log(typeof Runtime + "," + typeof runFlow)'],client);
-  assert.equal(exported,'function,function');
+    'import {Runtime,runFlow,ChatContinuationGuard} from "agent-runtime-lite"; console.log([Runtime,runFlow,ChatContinuationGuard].map(v=>typeof v).join(","))'],client);
+  assert.equal(exported,'function,function,function');
   const accepted=JSON.parse(cli(bin,['accept','--root',runtimeRoot,'--key','package-test',
     '--title','Separate consumer']));
   const commandFile=path.join(client,'command.json');
