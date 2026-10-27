@@ -58,6 +58,18 @@ The original CLI process did not need to remain open.
 - **任务依赖（未发布功能）**：后续 Job 可通过 `dependsOn: ['前置Job的key']` 等待同一 Task 中已登记的前置 Job 完成；`plan` 查看等待原因，`run-ready` 显式启动当前可运行的 Job。
 - **可控重试**：默认人工核对后续跑，明确只读的任务可以选择安全自动恢复。
 
+## 一条命令运行多步骤工作流（源码新功能）
+
+用户不必逐条复制 Task/Job ID。仓库提供 [示例工作流](examples/verified-workflow.json)，可在源码目录执行：
+
+```sh
+node bin/arl.mjs flow --root ./trial-workspace --flow-file ./examples/verified-workflow.json --wait-ms 10000
+```
+
+该命令按 JSON 清单登记两步任务，实际启动进程、验收本地 JSON 内容，前一步确认完成后启动下一步。重复执行相同清单时，会复用原有任务和 Job，不重复执行已经完成的步骤。也可运行 `arl drive --root ./trial-workspace --task TASK_ID` 接着推进已有任务。程序会返回启动、验收、待人工处理及最终状态；一次调用最多等待 30 秒，超时不意味着子进程被停止，可后续再次运行。
+
+**自动推进仅适用于没有额外人工 gate 的本地文件验收任务。** 人工审核、外部操作未确认、文件内容不符、以及仅按退出码判定的步骤都不能被自动视为已验收。不提供常驻守护进程，不自动重试失败任务；`--root` 中的任务记录和产物会保留。该功能尚未包含于已发布的 beta.2 安装包。
+
 ## 多步骤工作流（开发中，尚未包含在 beta.2 安装包）
 
 先提交上游 Job，再提交下游 Job，例如 `runtime.submit({taskId, key: 'review', command, dependsOn: ['produce']})`。必须是**同一 Task 内已经登记的 Job key**，不能前向引用，不允许循环依赖。随后调用 `runtime.runReady({taskId})`，仅启动依赖已经 `completed` 且资源空闲的排队 Job。上游成功退出但仍处于 `completion_candidate` 时，下游不能启动；真实结果读回后由调用方通过 gate 并 `complete()`，再次调用 `runReady` 才进入下一步。

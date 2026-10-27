@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
 import {StateStore, iso, processAlive} from './state.mjs';
+export {runFlow} from './flow.mjs';
 
 const fail = (message) => { throw new Error(message); };
 const id = (prefix) => prefix + '-' + randomUUID();
@@ -416,6 +417,75 @@ export class Runtime {
       }
     }
     return {started, waiting};
+  }
+  advance({taskId}) {
+    if (!taskId) fail('TASK_ID_REQUIRED');
+    const snapshot = this.store.read();
+    checkTask(snapshot, taskId);
+    const autoCompleted = [];
+    const needsReview = [];
+    for (const job of Object.values(snapshot.jobs)) {
+      if (job.taskId !== taskId || job.state !== 'completion_candidate') continue;
+      if (!job.fileCheck || job.gates.some(g =>
+        g.name !== 'process_exit_zero' && g.name !== 'local_file_check')) {
+        needsReview.push({jobId: job.id, reason: 'CALLER_EVIDENCE_REQUIRED'});
+        continue;
+      }
+      if (unknownEffects(job)) {
+        needsReview.push({jobId: job.id, reason: 'OPERATION_RECONCILIATION_REQUIRED'});
+        continue;
+      }
+      try {
+        this.verifyFile({jobId: job.id});
+        const done = this.complete({jobId: job.id});
+        if (!done.deduplicated) autoCompleted.push(job.id);
+      } catch (error) {
+        if (/^FILE_CHECK_(MISSING|UNREADABLE|INVALID_JSON|CONTENT_MISMATCH)$/.test(error.message)) {
+          needsReview.push({jobId: job.id, reason: error.message});
+        } else if (error.message === 'NOT_READY_TO_VALIDATE' ||
+          error.message === 'JOB_NOT_COMPLETION_CANDIDATE') {
+          // Another caller may have completed it during this scheduler pass.
+          if (this.status({jobId: job.id}).job.state !== 'completed') throw error;
+        } else throw error;
+      }
+    }
+    const {started, waiting} = this.runReady({taskId});
+    const status = this.status({taskId});
+    const reviewed = new Set(needsReview.map(item => item.jobId));
+    // A worker can finish after the initial snapshot but before this read.
+    // Let the driver take another pass instead of treating it as idle.
+    const autoPending = status.jobs.filter(job => job.state === 'completion_candidate' &&
+      job.fileCheck && !unknownEffects(job) &&
+      !job.gates.some(g => g.name !== 'process_exit_zero' && g.name !== 'local_file_check') &&
+      !reviewed.has(job.id)).map(job => job.id);
+    return {
+      taskId, taskState: status.task.state, autoCompleted, started, waiting, needsReview, autoPending,
+      active: status.jobs.filter(j => ['launching','running'].includes(j.state)).map(j => j.id),
+      failed: status.jobs.filter(j => ['failed','blocked'].includes(j.state))
+        .map(j => ({jobId:j.id, state:j.state}))
+    };
+  }
+  async drive({taskId, waitMs = 10000, pollMs = 100}) {
+    if (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > 30000) fail('DRIVE_WAIT_INVALID');
+    if (!Number.isInteger(pollMs) || pollMs < 25 || pollMs > 5000) fail('DRIVE_POLL_INVALID');
+    if (!taskId) fail('TASK_ID_REQUIRED');
+    // Only advances jobs previously submitted under this task. Does not
+    // auto-retry, accept external attestations, or invoke arbitrary verification.
+    const deadline = Date.now() + waitMs;
+    const completed = new Set();
+    const started = new Map();
+    let latest;
+    for (;;) {
+      latest = this.advance({taskId});
+      latest.autoCompleted.forEach(id => completed.add(id));
+      latest.started.forEach(row => started.set(row.jobId, row));
+      if ((!latest.active.length && !latest.autoPending.length) || Date.now() >= deadline) break;
+      if (latest.active.length) {
+        await new Promise(resolve => setTimeout(resolve, Math.min(pollMs, deadline - Date.now())));
+      }
+    }
+    const timedOut = latest.active.length > 0 && Date.now() >= deadline;
+    return {...latest, autoCompleted: [...completed], started: [...started.values()], timedOut};
   }
   retry({jobId}) {
     return this.store.update(state => {

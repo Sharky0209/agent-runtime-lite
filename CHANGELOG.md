@@ -4,6 +4,9 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Add bounded evidence-driven job progression (`advance` / `drive`) and declarative JSON manifest entrypoint (`flow`) with stable-key rerun/recovery. Only automatically confirm jobs whose local file checks pass without extra caller gates; return actionable pending-review states for all others.
+- Include an actual two-stage JSON workflow example, cross-process single-call execution tests and installed-package smoke coverage. No new npm package, background daemon or remote outcome verifier is implied.
+
 - Add an optional runtime-owned local JSON output check: actual field readback, a non-manually-passable file gate, and a second readback immediately before completion. Report local verification separately from caller attestation; allow both together without changing legacy/default jobs.
 - Cover real file output, malformed/missing/mismatched results, after-check file mutation, downstream job gating and installed CLI verification. Not a claim of remote-service verification or a published package.
 
