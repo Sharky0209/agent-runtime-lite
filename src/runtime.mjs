@@ -426,13 +426,13 @@ export class Runtime {
     const needsReview = [];
     for (const job of Object.values(snapshot.jobs)) {
       if (job.taskId !== taskId || job.state !== 'completion_candidate') continue;
+      if (unknownEffects(job)) {
+        needsReview.push({jobId: job.id, reason: 'OPERATION_RECONCILIATION_REQUIRED'});
+        continue;
+      }
       if (!job.fileCheck || job.gates.some(g =>
         g.name !== 'process_exit_zero' && g.name !== 'local_file_check')) {
         needsReview.push({jobId: job.id, reason: 'CALLER_EVIDENCE_REQUIRED'});
-        continue;
-      }
-      if (unknownEffects(job)) {
-        needsReview.push({jobId: job.id, reason: 'OPERATION_RECONCILIATION_REQUIRED'});
         continue;
       }
       try {
@@ -451,15 +451,24 @@ export class Runtime {
     }
     const {started, waiting} = this.runReady({taskId});
     const status = this.status({taskId});
-    const reviewed = new Set(needsReview.map(item => item.jobId));
-    // A worker can finish after the initial snapshot but before this read.
-    // Let the driver take another pass instead of treating it as idle.
-    const autoPending = status.jobs.filter(job => job.state === 'completion_candidate' &&
-      job.fileCheck && !unknownEffects(job) &&
-      !job.gates.some(g => g.name !== 'process_exit_zero' && g.name !== 'local_file_check') &&
-      !reviewed.has(job.id)).map(job => job.id);
+    const candidates = status.jobs.filter(job => job.state === 'completion_candidate');
+    const candidateIds = new Set(candidates.map(job => job.id));
+    const currentReview = needsReview.filter(item => candidateIds.has(item.jobId));
+    const reviewed = new Set(currentReview.map(item => item.jobId));
+    // Workers can finish between snapshots, including jobs needing manual
+    // evidence. Report those correctly instead of declaring an idle task.
+    const autoPending = [];
+    for (const job of candidates) {
+      if (reviewed.has(job.id)) continue;
+      if (unknownEffects(job)) {
+        currentReview.push({jobId: job.id, reason: 'OPERATION_RECONCILIATION_REQUIRED'});
+      } else if (!job.fileCheck || job.gates.some(g =>
+        g.name !== 'process_exit_zero' && g.name !== 'local_file_check')) {
+        currentReview.push({jobId: job.id, reason: 'CALLER_EVIDENCE_REQUIRED'});
+      } else autoPending.push(job.id);
+    }
     return {
-      taskId, taskState: status.task.state, autoCompleted, started, waiting, needsReview, autoPending,
+      taskId, taskState: status.task.state, autoCompleted, started, waiting, needsReview: currentReview, autoPending,
       active: status.jobs.filter(j => ['launching','running'].includes(j.state)).map(j => j.id),
       failed: status.jobs.filter(j => ['failed','blocked'].includes(j.state))
         .map(j => ({jobId:j.id, state:j.state}))

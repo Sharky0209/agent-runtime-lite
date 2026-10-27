@@ -62,6 +62,29 @@ test('driver revisits a completion candidate observed after its first scheduling
   } finally {f.cleanup();}
 });
 
+test('a manual candidate emerging during dispatch is surfaced for review',()=>{
+  const f=make();
+  try {
+    const taskId=f.rt.accept({key:'late-manual',title:'Late manual candidate'}).task.id;
+    const job=f.rt.submit({taskId,key:'checked-and-reviewed',command:cmd('process.exit(0)'),
+      fileCheck:file('report.json',{ok:true}),gates:['review']}).job;
+    // Deterministically model an already-launched worker reaching candidate
+    // between the first status snapshot and the final status read.
+    f.rt.runReady=()=>{
+      f.rt.store.update(state=>{
+        const row=state.jobs[job.id];
+        row.state='completion_candidate';
+        row.gates.find(g=>g.name==='process_exit_zero').passed=true;
+      });
+      return {started:[],waiting:[]};
+    };
+    const round=f.rt.advance({taskId});
+    assert.equal(round.taskState,'validating');
+    assert.deepEqual(round.autoPending,[]);
+    assert.deepEqual(round.needsReview,[{jobId:job.id,reason:'CALLER_EVIDENCE_REQUIRED'}]);
+  } finally {f.cleanup();}
+});
+
 test('drive stops at a manual evidence boundary and does not launch downstream',async()=>{
   const f=make();
   try {
