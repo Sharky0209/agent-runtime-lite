@@ -118,6 +118,27 @@ The commands above assume `r` is a `Runtime` instance and `producerCommand` / `r
 
 A dependency requires its predecessor to be marked `completed`. If that predecessor was deliberately configured as `exit_only`, this is **not independent evidence** of its external outcome. Failed predecessors never unlock downstream work. This feature does not automatically verify output, retry external effects or run an always-on scheduler.
 
+## Runtime-checked local output (new, unreleased)
+
+For tasks producing local JSON, `fileCheck` gives the runtime a **concrete readback contract**, instead of relying on a caller to claim the file was inspected. This is narrower than arbitrary external-outcome verification: the runtime checks specified top-level JSON fields at the configured workspace-relative path, and rechecks them immediately before completion.
+
+```js
+const taskId = r.accept({key: 'checked-report', title: 'Build a checked report'}).task.id;
+const {job} = r.submit({
+  taskId, key: 'report', command: reportCommand,
+  fileCheck: {path: 'report.json', jsonFields: {status: 'ready', count: 3}}
+});
+r.start({jobId: job.id});
+// Wait for completion_candidate; the worker must actually write report.json.
+r.verifyFile({jobId: job.id}); // independently opens/parses/checks the file
+r.complete({jobId: job.id});   // rechecks the file before storing completion
+// completionBasis is local_file_checked, not caller_attested.
+```
+
+From the CLI, pass `--file-check '{"path":"report.json","jsonFields":{"status":"ready","count":3}}'` when submitting, then use `arl verify-file --root ./state --job JOB_ID` after successful process exit. The CLI option is a JSON argument; PowerShell and Bash quoting differ. The path resolves relative to the runtime `--root` directory; the command must write there (or use an explicit matching location). Matching fields must have identical JSON values, though other fields may exist. A missing, invalid, or mismatched file never passes the gate. Unlike a manually passed gate, `local_file_check` cannot be satisfied with a caller-provided string.
+
+When both `fileCheck` and custom caller gates are configured, all must pass and the completion basis is `local_file_checked_plus_caller_attested`. With `fileCheck` alone, no separate `caller_attestation` gate is needed. `exit_only` cannot be combined with file checking. A matching pre-existing local file can satisfy the condition: this demonstrates **observed file contents at check time**, not that the most recent command created them, and it is not proof of a third-party delivery. The already published `v0.2.0-beta.2` archive does **not** contain this unreleased feature.
+
 ## JavaScript API
 
 ```js

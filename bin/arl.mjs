@@ -34,6 +34,7 @@ const routes = {
     taskId: arg('task'), key: arg('key'), command: commandInput(),
     resources: parsed.resources ? json(parsed.resources) : [],
     dependsOn: parsed['depends-on'] ? json(arg('depends-on')) : [],
+    fileCheck: parsed['file-check'] ? json(arg('file-check')) : null,
     gates: gateNames(),
     readOnly: parsed['read-only'] === true,
     resume: parsed.resume || 'manual',
@@ -53,13 +54,14 @@ const routes = {
   'op-confirm': () => runtime.settleOperation({jobId: arg('job'), key: arg('key'), outcome:'confirmed', evidence:arg('evidence')}),
   'op-abort': () => runtime.settleOperation({jobId: arg('job'), key: arg('key'), outcome:'aborted', evidence:arg('evidence')}),
   gate: () => runtime.passGate({jobId: arg('job'), name: arg('name'), evidence: arg('evidence')}),
+  'verify-file': () => runtime.verifyFile({jobId: arg('job')}),
   complete: () => runtime.complete({jobId: arg('job')})
 };
 const usage = `Agent Runtime Lite
 Usage: arl <command> [options]
 
 Commands: accept, submit, start, plan, run-ready, status, checkpoint, op-begin,
-          op-confirm, op-abort, gate, complete, retry, recover, doctor, demo
+          op-confirm, op-abort, gate, verify-file, complete, retry, recover, doctor, demo
 
 Global:   --root <directory>  Select a local state directory
 Doctor:   arl doctor --root ./state  (read-only, share-safe counts)
@@ -72,9 +74,13 @@ Submit:   --task <id> --key <name>
           --gate <name>     OR  --gates <JSON array>
           --resources <JSON array>  (optional)
           --depends-on <JSON array of preceding job keys>  (optional)
+          --file-check <JSON>  e.g. {"path":"report.json","jsonFields":{"ok":true}}
           --completion-mode attested|exit_only  (default: attested)
           Default: caller must pass --name caller_attestation with evidence
           exit_only: explicit, unverified process-exit semantics (no --gate)
+
+Readback: arl verify-file --root ./demo --job JOB_ID
+          Checks real local JSON content for a declared --file-check gate.
 
 Workflow: arl plan --root ./demo --task TASK_ID   (read-only readiness)
           arl run-ready --root ./demo --task TASK_ID

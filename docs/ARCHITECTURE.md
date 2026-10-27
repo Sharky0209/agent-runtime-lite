@@ -29,6 +29,12 @@ Read-only `plan({taskId})` reports readiness and dependencies/resources holding 
 
 The state is persisted as an atomic JSON snapshot and synchronized with a local lock. The approach is deliberately simple and works best with small to medium local agent workloads.
 
+## Runtime-owned local file evidence (unreleased)
+
+An optional `fileCheck: {path, jsonFields}` is an immutable job contract for expected JSON fields in a local file under the runtime root. It requires `attested` mode and installs a reserved `local_file_check` gate, which `passGate()` cannot set. `verifyFile({jobId})` actually opens, parses and compares the named top-level fields while the state transition is locked. `complete()` repeats this readback immediately before committing the final state, so evidence cannot remain valid after an ordinary intervening file mutation. Retrying an execution resets the gate.
+
+When only this check is configured, the completion basis is `local_file_checked`; it can coexist with caller gates, resulting in `local_file_checked_plus_caller_attested`. Without `fileCheck`, all existing completion behavior is unchanged. File checks are local condition checks, **not** independent remote-business verification or proof of which process created a matching file. Files may be modified after completion; the record establishes the observation at validation/completion time, not permanent artifact integrity.
+
 ## Recovery behavior
 
 Running jobs are only considered lost when the recorded worker is gone. If a child is still alive, recovery reports a blocker rather than launching a second command. Before spawning a child, the worker records a durable `spawnIntentAt` marker. If it crashes before persisting the child's PID, recovery blocks as `CHILD_DISPATCH_UNCERTAIN` rather than guessing that the child never started. The resource reservation remains held even if an uncertain external operation is later reconciled. An operator must inspect the outcome and make an explicit `retry()` decision after verifying it is safe to rerun; that transition releases the old reservations. Automatic recovery is opt-in and limited to declared read-only jobs with no outstanding dispatch uncertainty. Other jobs require explicit review and `retry()`.
@@ -48,7 +54,7 @@ The library cannot know what an application actually wrote. The caller records t
 - Single local host only. The lock is not a distributed lock.
 - No timer-based or autonomous scheduling or long-lived service watchdog. `runReady` is an explicit one-shot dispatcher.
 - No built-in remote application integrations.
-- Evidence is supplied by a caller; the library does not inspect arbitrary systems to prove claims.
+- External-business evidence is supplied by a caller; the optional built-in local JSON check verifies only explicitly named fields in one local file, not arbitrary systems.
 - No guarantee that an arbitrary command is safe to rerun, even if a user marks it read-only.
 - Child-process supervision is per direct child, not a portable process-tree termination service; applications launching descendants must manage their own cleanup.
 

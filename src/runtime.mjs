@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
+import {isDeepStrictEqual} from 'node:util';
 import {StateStore, iso, processAlive} from './state.mjs';
 
 const fail = (message) => { throw new Error(message); };
@@ -30,12 +31,41 @@ const commandShape = (command) => {
   if (command.cwd != null && typeof command.cwd !== 'string') fail('COMMAND_CWD_INVALID');
   return {exe: command.exe, args: [...command.args], ...(command.cwd ? {cwd: command.cwd} : {})};
 };
+const normalizeFileCheck = (root, input) => {
+  if (input == null) return null;
+  if (!input || typeof input !== 'object' || Array.isArray(input) ||
+    typeof input.path !== 'string' || !input.path.trim() ||
+    !input.jsonFields || typeof input.jsonFields !== 'object' ||
+    Array.isArray(input.jsonFields) || !Object.keys(input.jsonFields).length) fail('FILE_CHECK_INVALID');
+  if (path.isAbsolute(input.path) || path.win32.isAbsolute(input.path)) fail('FILE_CHECK_INVALID');
+  const absolute = path.resolve(root, input.path);
+  const relative = path.relative(root, absolute);
+  if (relative === '' || relative === '..' || relative.startsWith('..' + path.sep)) fail('FILE_CHECK_INVALID');
+  return {path: input.path, jsonFields: JSON.parse(JSON.stringify(input.jsonFields))};
+};
+const inspectFile = (root, spec) => {
+  const absolute = path.resolve(root, spec.path);
+  let content;
+  try { content = fs.readFileSync(absolute, 'utf8'); }
+  catch (error) {
+    if (error.code === 'ENOENT') fail('FILE_CHECK_MISSING');
+    fail('FILE_CHECK_UNREADABLE');
+  }
+  let parsed;
+  try { parsed = JSON.parse(content); } catch { fail('FILE_CHECK_INVALID_JSON'); }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) ||
+    !Object.entries(spec.jsonFields).every(([key, expected]) =>
+      Object.hasOwn(parsed,key) && isDeepStrictEqual(parsed[key],expected))) fail('FILE_CHECK_CONTENT_MISMATCH');
+  return {checkedFields: Object.keys(spec.jsonFields).length};
+};
 const checkJob = (state, jobId) => state.jobs[jobId] || fail('JOB_NOT_FOUND');
 const checkTask = (state, taskId) => state.tasks[taskId] || fail('TASK_NOT_FOUND');
 const touch = (row) => { row.updatedAt = iso(); return row; };
 // v0.1.x jobs have no completionMode. Never silently retrofit their gates:
 // preserve their stored contract, but label the actual basis on completion.
 const completionBasis = (job) => {
+  if (job.fileCheck) return job.gates.some(g => g.name !== 'process_exit_zero' && g.name !== 'local_file_check') ?
+    'local_file_checked_plus_caller_attested' : 'local_file_checked';
   if (job.completionMode === 'attested') return 'caller_attested';
   if (job.completionMode === 'exit_only') return 'process_exit_only';
   return job.gates.some(g => g.name !== 'process_exit_zero') ?
@@ -77,14 +107,16 @@ export class Runtime {
   }
   submit({taskId, key, command, required = true, gates = [], resources = [],
     resume = 'manual', readOnly = false, maxRestarts = 0, timeoutMs = 0,
-    completionMode = 'attested', dependsOn = []}) {
+    completionMode = 'attested', dependsOn = [], fileCheck = null}) {
     if (!key) fail('JOB_KEY_REQUIRED');
     const normalized = commandShape(command);
     if (!['manual', 'auto_safe'].includes(resume)) fail('RESUME_POLICY_INVALID');
     if (!['attested', 'exit_only'].includes(completionMode)) fail('COMPLETION_MODE_INVALID');
+    const normalizedFileCheck = normalizeFileCheck(this.root, fileCheck);
+    if (normalizedFileCheck && completionMode === 'exit_only') fail('EXIT_ONLY_DISALLOWS_FILE_CHECK');
     if (resume === 'auto_safe' && !readOnly) fail('AUTO_RECOVERY_REQUIRES_READ_ONLY');
     if (!Array.isArray(resources) || !resources.every(v => typeof v === 'string' && v.trim())) fail('RESOURCES_INVALID');
-    if (!Array.isArray(gates) || !gates.every(v => typeof v === 'string' && v.trim() && !['process_exit_zero','caller_attestation'].includes(v))) fail('GATES_INVALID');
+    if (!Array.isArray(gates) || !gates.every(v => typeof v === 'string' && v.trim() && !['process_exit_zero','caller_attestation','local_file_check'].includes(v))) fail('GATES_INVALID');
     if (new Set(gates).size !== gates.length) fail('DUPLICATE_GATE');
     if (!Array.isArray(dependsOn) || !dependsOn.every(v => typeof v === 'string' && v.trim())) fail('DEPENDENCIES_INVALID');
     if (new Set(dependsOn).size !== dependsOn.length) fail('DUPLICATE_DEPENDENCY');
@@ -92,7 +124,7 @@ export class Runtime {
     if (completionMode === 'exit_only' && gates.length) fail('EXIT_ONLY_DISALLOWS_CUSTOM_GATES');
     if (!Number.isInteger(maxRestarts) || maxRestarts < 0 || !Number.isInteger(timeoutMs) || timeoutMs < 0) fail('JOB_LIMIT_INVALID');
     const immutable = {command: normalized, required: !!required, readOnly: !!readOnly,
-      resume, maxRestarts, timeoutMs, resources: [...new Set(resources)], gates, completionMode, dependsOn: [...dependsOn]};
+      resume, maxRestarts, timeoutMs, resources: [...new Set(resources)], gates, completionMode, dependsOn: [...dependsOn], fileCheck: normalizedFileCheck};
     return this.store.update(state => {
       checkTask(state, taskId);
       const lookup = JSON.stringify([taskId,key]);
@@ -101,8 +133,9 @@ export class Runtime {
         const previousImmutable = {command: previous.command, required: previous.required,
           readOnly: previous.readOnly, resume: previous.resume, maxRestarts: previous.maxRestarts,
           timeoutMs: previous.timeoutMs, resources: previous.resources,
-          gates: previous.gates.filter(g => !['process_exit_zero','caller_attestation'].includes(g.name)).map(g => g.name),
-          completionMode: previous.completionMode || 'legacy', dependsOn: previous.dependsOn || []};
+          gates: previous.gates.filter(g => !['process_exit_zero','caller_attestation','local_file_check'].includes(g.name)).map(g => g.name),
+          completionMode: previous.completionMode || 'legacy', dependsOn: previous.dependsOn || [],
+          fileCheck: previous.fileCheck || null};
         if (JSON.stringify(previousImmutable) !== JSON.stringify(immutable)) fail('JOB_KEY_PAYLOAD_CONFLICT');
         return {deduplicated: true, job: copy(previous)};
       }
@@ -114,9 +147,11 @@ export class Runtime {
       const now = iso();
       const job = {id: id('job'), kind: 'runtime_job', taskId, key, command: normalized,
         required: !!required, readOnly: !!readOnly, resume, maxRestarts, timeoutMs, completionMode,
-        dependsOn: [...dependsOn], resources: [...new Set(resources)], operations: [],
+        dependsOn: [...dependsOn], fileCheck: normalizedFileCheck,
+        resources: [...new Set(resources)], operations: [],
         gates: [{name: 'process_exit_zero', passed: false, evidence: null},
-          ...(completionMode === 'attested' && gates.length === 0 ?
+          ...(normalizedFileCheck ? [{name: 'local_file_check', passed: false, evidence: null}] : []),
+          ...(completionMode === 'attested' && gates.length === 0 && !normalizedFileCheck ?
             [{name: 'caller_attestation', passed: false, evidence: null}] : []),
           ...gates.map(name => ({name, passed: false, evidence: null}))],
         attempts: [], state: 'queued', createdAt: now, updatedAt: now, blockReason: null};
@@ -232,8 +267,25 @@ export class Runtime {
       return copy(op);
     });
   }
+  verifyFile({jobId}) {
+    return this.store.update(state => {
+      const job = checkJob(state, jobId);
+      if (job.state !== 'completion_candidate') fail('NOT_READY_TO_VALIDATE');
+      if (!job.fileCheck) fail('FILE_CHECK_NOT_CONFIGURED');
+      const result = inspectFile(this.root, job.fileCheck);
+      const gate = job.gates.find(g => g.name === 'local_file_check');
+      if (!gate) fail('FILE_GATE_MISSING');
+      gate.passed = true;
+      gate.source = 'runtime_local_file_readback';
+      gate.checkedAt = iso();
+      gate.evidence = 'JSON fields independently read and matched';
+      touch(job);
+      return {passed: true, checkedFields: result.checkedFields, gate: copy(gate)};
+    });
+  }
   passGate({jobId, name, evidence}) {
     if (name === 'process_exit_zero') fail('PROCESS_GATE_OWNED_BY_WORKER');
+    if (name === 'local_file_check') fail('FILE_GATE_OWNED_BY_RUNTIME');
     if (!evidence || !String(evidence).trim()) fail('GATE_EVIDENCE_REQUIRED');
     return this.store.update(state => {
       const job = checkJob(state, jobId);
@@ -252,6 +304,13 @@ export class Runtime {
       if (job.state === 'completed') return {deduplicated: true, job: copy(job)};
       if (job.state !== 'completion_candidate') fail('JOB_NOT_COMPLETION_CANDIDATE');
       if (job.gates.some(g => !g.passed)) fail('COMPLETION_GATES_PENDING');
+      if (job.fileCheck) {
+        const gate = job.gates.find(g => g.name === 'local_file_check');
+        if (gate?.source !== 'runtime_local_file_readback') fail('FILE_VERIFICATION_REQUIRED');
+        // The artifact may change after the earlier verification call.
+        // Check it again immediately before committing completion.
+        inspectFile(this.root, job.fileCheck);
+      }
       // No completed attested job may have only the OS process-exit gate.
       // Custom caller-evidence gates replace, rather than duplicate, the default attestation.
       if (job.completionMode === 'attested' &&
@@ -366,7 +425,10 @@ export class Runtime {
       if (processAlive(attempt?.workerPid) || processAlive(attempt?.childPid)) fail('PROCESS_STILL_ALIVE');
       if (unknownEffects(job)) fail('OPERATION_RECONCILIATION_REQUIRED');
       job.state = 'queued'; job.blockReason = null;
-      job.gates.forEach(g => {g.passed = false; g.evidence = null;});
+      job.gates.forEach(g => {
+        g.passed = false; g.evidence = null;
+        delete g.source; delete g.checkedAt;
+      });
       releaseResources(state, job);
       touch(job);
       return copy(job);

@@ -64,6 +64,14 @@ The original CLI process did not need to remain open.
 
 CLI：`arl plan --root ./state --task TASK_ID` 只读查看可运行与等待项；`arl run-ready --root ./state --task TASK_ID` 执行一次调度，**都必须指定 Task ID**。这不是常驻调度器或自动结果验证；前置任务若使用 `exit_only`，其 `completed` 仍只表示退出码成功。详细说明见[英文 README](README.md)。
 
+## 运行时实际读取本地文件（开发中，未包含在 beta.2 安装包）
+
+对于会生成 JSON 报告的任务，可以在 `submit` 中设置 `fileCheck: {path: 'report.json', jsonFields: {status: 'ready', count: 3}}`。运行时会在指定工作区目录中实际打开文件、解析 JSON、逐项检查字段，而不是接受“我已经检查过”的文字声明。
+
+进程退出后必须处于 `completion_candidate`，再运行 `runtime.verifyFile({jobId})` 或 CLI `arl verify-file --root ./state --job JOB_ID`。验收成功才通过 `local_file_check` 门禁，`complete()` 还会在写入完成状态前重新检查文件，避免中途改坏仍被当作成功。缺文件、JSON 无效、字段值不符都会拒绝；其他未列举的 JSON 字段允许存在。该路径以运行时的 `--root` 为基准。
+
+只用文件检查时，`completionBasis=local_file_checked`，无需重复要求 `caller_attestation`；如还配置了其他人工 gate，则必须全部通过，结果标记为 `local_file_checked_plus_caller_attested`。不能把文件门禁改用人工文字通过，也不能搭配 `exit_only`。**它确认的是检查时本地文件的内容，不证明文件一定由本次任务生成，更不能据此声称微信、云端或业务系统已收到结果。** 该功能目前只在源码主线开发中，不属于已公开的 beta.2 安装包。
+
 ## 默认验收与可选退出码模式
 
 - **默认 `attested`**：需要内置进程退出检查和至少一项调用方证据。没有自定义 gate 时要求 `caller_attestation`；指定了自定义 gate 时需全部通过，不重复增加确认。

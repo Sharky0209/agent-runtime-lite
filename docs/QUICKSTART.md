@@ -99,4 +99,8 @@ A new job defaults to mandatory caller evidence: if you omit `--gate`, the requi
 
 The source checkout now offers same-task dependent jobs. Submit a first Job with `--key produce`, then a second using `--key inspect --depends-on '["produce"]'` (also supplying `--task` and `--command-file`). The predecessor must be registered before the dependent. Inspect with `node bin/arl.mjs plan --root ./my-agent-state --task TASK_ID`, then dispatch once using `node bin/arl.mjs run-ready --root ./my-agent-state --task TASK_ID`. Check actual results, pass the first Job's gate and complete it before running `run-ready` again to launch `inspect`. These commands do not auto-verify output, and `run-ready` does not run continuously. See the [README workflow guide](../README.md#multi-step-workflows-new-unreleased).
 
+## Runtime-checked JSON results (unreleased source checkout)
+
+For a report-writing job, add `--file-check '{"path":"report.json","jsonFields":{"status":"ready"}}'` to `submit` (adapt JSON quoting for your shell). Make the job's child write `report.json` under the chosen `--root`. Once `status` shows `completion_candidate`, call `node bin/arl.mjs verify-file --root ./my-agent-state --job JOB_ID` and then `complete`. The runtime reads the real JSON, checks `status`, and checks again at completion. Missing/invalid/mismatched files fail. Unlike `gate --evidence`, this check cannot be satisfied by a caller statement; it also does not verify remote business systems or prove that a pre-existing matching file came from this attempt. See [README](../README.md#runtime-checked-local-output-new-unreleased) for the API and limits.
+
 See [architecture](ARCHITECTURE.md), [maintenance](MAINTENANCE.md), and [contributing](../CONTRIBUTING.md).
