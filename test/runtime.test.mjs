@@ -170,7 +170,19 @@ test('operations are uncertain until reconciled and cannot be replayed as new', 
     assert.throws(() => f.rt.settleOperation({jobId,key:'send-one',outcome:'confirmed'}), /EVIDENCE_REQUIRED/);
     const settled = f.rt.settleOperation({jobId,key:'send-one',outcome:'confirmed',evidence:'external readback confirms it'});
     assert.equal(settled.state, 'confirmed');
+    const replayed = new Runtime(f.root).settleOperation({
+      jobId,key:'send-one',outcome:'confirmed',evidence:'later inconsistent statement'
+    });
+    assert.deepEqual(replayed, settled, 'a repeated settlement must preserve the original evidence and timestamp');
+    assert.deepEqual(f.rt.status({jobId}).job.operations[0], settled,
+      'the persisted operation must not be overwritten by a replay');
     assert.throws(() => f.rt.settleOperation({jobId,key:'send-one',outcome:'aborted',evidence:'later guess'}), /ALREADY_SETTLED/);
+    f.rt.beginOperation({jobId,key:'send-two'});
+    const aborted = f.rt.settleOperation({jobId,key:'send-two',outcome:'aborted',evidence:'dispatch did not occur'});
+    assert.deepEqual(new Runtime(f.root).settleOperation({
+      jobId,key:'send-two',outcome:'aborted',evidence:'later changed statement'
+    }), aborted, 'aborted settlement evidence must also remain immutable');
+    assert.deepEqual(f.rt.status({jobId}).job.operations[1], aborted);
     assert.equal(f.rt.beginOperation({jobId,key:'send-one'}).operation.state, 'confirmed');
   } finally {f.cleanup();}
 });

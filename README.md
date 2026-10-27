@@ -131,7 +131,7 @@ r.settleOperation({jobId, key: 'publish-1', outcome: 'confirmed', evidence: 'Tar
 // or outcome: 'aborted', if you established that dispatch never occurred
 ```
 
-The library does not send external requests itself and cannot certify evidence automatically. You provide the external implementation and truthful readback. An uncertain operation prevents final completion and prevents an unsafe retry.
+The library does not send external requests itself and cannot certify evidence automatically. You provide the external implementation and truthful readback. An uncertain operation prevents final completion and prevents an unsafe retry. Once an operation is settled, repeating the same outcome returns its original record without replacing the first evidence; attempting the opposite outcome is rejected.
 
 ## Diagnosing a workspace
 

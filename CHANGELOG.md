@@ -4,6 +4,7 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Preserve the first recorded settlement evidence and timestamp when an external operation is confirmed or aborted more than once; matching retries return the original result without rewriting the audit trail.
 - Make npm publication opt-in and beta-tagged, with a safe validate-only default, explicit package file audit and post-publish version readback.
 - Update GitHub Actions to newer Node.js 24-based action runtimes and disable unnecessary package manager caching; retain Node.js 20/22 compatibility checks.
 - Add documented one-time npm account bootstrap and subsequent OIDC trusted publishing instructions; no registry package or new release is implied.
