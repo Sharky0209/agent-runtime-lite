@@ -21,6 +21,12 @@ Agent Runtime Lite is a local, single-host task runner that stores durable state
 5. Exit code zero establishes only a completion **candidate**. In default `attested` mode, the caller inspects business output and passes the required custom evidence gates, or the automatically inserted `caller_attestation` if no custom gates exist. The runtime does not validate that the caller's evidence is truthful.
 6. `complete()` verifies all gates, enforces the mandatory attestation gate even if it is missing from a modified state, and refuses unresolved external operations. Results record `completionBasis`: `caller_attested` or explicit `process_exit_only`. Previously persisted v0.1.x jobs keep their stored requirements and are labeled with a `legacy_*` completion basis. The task's derived status then reflects its required jobs.
 
+## Explicit dependent-job workflows (unreleased)
+
+Jobs may declare `dependsOn: ['earlier-job-key']` within the same control task. Predecessors must already have been submitted; this prevents cycles by construction and keeps dependencies stable across CLI sessions. The dependency list participates in the idempotency contract and cannot silently change on repeated submission. A direct `start()` or one-shot `runReady({taskId})` refuses to dispatch a child until **all** predecessor states are `completed`, not merely `completion_candidate`. The check happens inside the same state lock as resource reservations and attempt creation. It therefore applies even if callers bypass the planner or race on separate CLI sessions.
+
+Read-only `plan({taskId})` reports readiness and dependencies/resources holding queued jobs. `runReady` tries eligible queued jobs in submission order and reports resource conflicts/dependency waits; it never retries failed jobs or attests their completion. A prior `exit_only` job can satisfy a dependency, but this preserves its declared **process-only, unverified** semantics. Callers drive further stages after explicit outcome review. This is not an autonomous scheduler, distributed execution engine or guarantee that external effects were verified.
+
 The state is persisted as an atomic JSON snapshot and synchronized with a local lock. The approach is deliberately simple and works best with small to medium local agent workloads.
 
 ## Recovery behavior
@@ -40,7 +46,7 @@ The library cannot know what an application actually wrote. The caller records t
 ## Design limits
 
 - Single local host only. The lock is not a distributed lock.
-- No built-in scheduling or long-lived service watchdog.
+- No timer-based or autonomous scheduling or long-lived service watchdog. `runReady` is an explicit one-shot dispatcher.
 - No built-in remote application integrations.
 - Evidence is supplied by a caller; the library does not inspect arbitrary systems to prove claims.
 - No guarantee that an arbitrary command is safe to rerun, even if a user marks it read-only.

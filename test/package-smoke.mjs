@@ -39,6 +39,7 @@ try{
   assert.match(help,/--command-file/);
   assert.match(help,/submit/);
   assert.match(help,/arl demo/);
+  assert.match(help,/run-ready/);
   const installedVersion=JSON.parse(fs.readFileSync(path.join(client,'node_modules','agent-runtime-lite','package.json'),'utf8')).version;
   assert.equal(cli(bin,['--version']),installedVersion);
   // This runs the real detached worker and separate CLI callers from the installed package.
@@ -93,17 +94,41 @@ try{
   const completed=JSON.parse(cli(bin,['complete','--root',runtimeRoot,'--job',jobId]));
   assert.equal(completed.job.state,'completed');
   assert.equal(completed.job.completionBasis,'caller_attested');
+  // Verify the new workflow command from the installed, not source, CLI.
+  const dependent=JSON.parse(cli(bin,['submit','--root',runtimeRoot,'--task',accepted.task.id,
+    '--key','follow-up','--command-file',commandFile,'--depends-on','["run"]'])).job;
+  assert.deepEqual(dependent.dependsOn,['run']);
+  const readiness=JSON.parse(cli(bin,['plan','--root',runtimeRoot,'--task',accepted.task.id]));
+  assert.equal(readiness.jobs.find(job=>job.jobId===dependent.id).ready,true);
+  const batch=JSON.parse(cli(bin,['run-ready','--root',runtimeRoot,'--task',accepted.task.id]));
+  assert.equal(batch.started.length,1);
+  assert.equal(batch.started[0].jobId,dependent.id);
+  let next;
+  for(let i=0;i<100;i++){
+    const current=JSON.parse(cli(bin,['status','--root',runtimeRoot,'--job',dependent.id])).job;
+    if (current.state==='completion_candidate') {next=current;break;}
+    if (current.state==='failed'||current.state==='blocked') throw Error('Dependent worker failed: '+current.blockReason);
+    await pause(70);
+  }
+  assert.ok(next,'installed dependent worker did not reach completion candidate');
+  const nextAttempt=next.attempts.at(-1);
+  assert.match(fs.readFileSync(path.join(runtimeRoot,'.arl','logs',dependent.id+'-'+nextAttempt.id+'.log'),'utf8'),
+    /ISOLATED_PACKAGE_OUTPUT/);
+  JSON.parse(cli(bin,['gate','--root',runtimeRoot,'--job',dependent.id,'--name','caller_attestation',
+    '--evidence','Follow-up installed child log independently checked']));
+  JSON.parse(cli(bin,['complete','--root',runtimeRoot,'--job',dependent.id]));
   const status=JSON.parse(cli(bin,['status','--root',runtimeRoot,'--task',accepted.task.id]));
   assert.equal(status.task.state,'completed');
-  assert.equal(status.jobs[0].attempts.length,1);
+  assert.equal(status.jobs.length,2);
+  assert.ok(status.jobs.every(job=>job.attempts.length===1));
   const diagnosis=JSON.parse(cli(bin,['doctor','--root',runtimeRoot]));
-  assert.equal(diagnosis.counts.jobs,1);
-  assert.equal(diagnosis.jobsByState.completed,1);
+  assert.equal(diagnosis.counts.jobs,2);
+  assert.equal(diagnosis.jobsByState.completed,2);
   assert.equal(diagnosis.counts.reservedResources,0);
   console.log('PACKAGE_INSTALL_PASS',JSON.stringify({
     version:installedVersion,platform:process.platform,cliShim:true,
     exportResolved:true,helpVerified:true,negativeExitCodes:true,
-    realChildExecuted:true,evidenceGateEnforced:true,attempts:1}));
+    realChildExecuted:true,evidenceGateEnforced:true,workflowDependency:true,attempts:2}));
 } finally {
   fs.rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:150});
 }

@@ -77,7 +77,7 @@ export class Runtime {
   }
   submit({taskId, key, command, required = true, gates = [], resources = [],
     resume = 'manual', readOnly = false, maxRestarts = 0, timeoutMs = 0,
-    completionMode = 'attested'}) {
+    completionMode = 'attested', dependsOn = []}) {
     if (!key) fail('JOB_KEY_REQUIRED');
     const normalized = commandShape(command);
     if (!['manual', 'auto_safe'].includes(resume)) fail('RESUME_POLICY_INVALID');
@@ -86,10 +86,13 @@ export class Runtime {
     if (!Array.isArray(resources) || !resources.every(v => typeof v === 'string' && v.trim())) fail('RESOURCES_INVALID');
     if (!Array.isArray(gates) || !gates.every(v => typeof v === 'string' && v.trim() && !['process_exit_zero','caller_attestation'].includes(v))) fail('GATES_INVALID');
     if (new Set(gates).size !== gates.length) fail('DUPLICATE_GATE');
+    if (!Array.isArray(dependsOn) || !dependsOn.every(v => typeof v === 'string' && v.trim())) fail('DEPENDENCIES_INVALID');
+    if (new Set(dependsOn).size !== dependsOn.length) fail('DUPLICATE_DEPENDENCY');
+    if (dependsOn.includes(key)) fail('DEPENDENCY_SELF');
     if (completionMode === 'exit_only' && gates.length) fail('EXIT_ONLY_DISALLOWS_CUSTOM_GATES');
     if (!Number.isInteger(maxRestarts) || maxRestarts < 0 || !Number.isInteger(timeoutMs) || timeoutMs < 0) fail('JOB_LIMIT_INVALID');
     const immutable = {command: normalized, required: !!required, readOnly: !!readOnly,
-      resume, maxRestarts, timeoutMs, resources: [...new Set(resources)], gates, completionMode};
+      resume, maxRestarts, timeoutMs, resources: [...new Set(resources)], gates, completionMode, dependsOn: [...dependsOn]};
     return this.store.update(state => {
       checkTask(state, taskId);
       const lookup = JSON.stringify([taskId,key]);
@@ -99,14 +102,19 @@ export class Runtime {
           readOnly: previous.readOnly, resume: previous.resume, maxRestarts: previous.maxRestarts,
           timeoutMs: previous.timeoutMs, resources: previous.resources,
           gates: previous.gates.filter(g => !['process_exit_zero','caller_attestation'].includes(g.name)).map(g => g.name),
-          completionMode: previous.completionMode || 'legacy'};
+          completionMode: previous.completionMode || 'legacy', dependsOn: previous.dependsOn || []};
         if (JSON.stringify(previousImmutable) !== JSON.stringify(immutable)) fail('JOB_KEY_PAYLOAD_CONFLICT');
         return {deduplicated: true, job: copy(previous)};
+      }
+      // Predecessors must already exist in this task. This rules out cycles
+      // without creating unresolved references or modifying older jobs.
+      for (const dependency of dependsOn) {
+        if (!state.jobKeys[JSON.stringify([taskId, dependency])]) fail('DEPENDENCY_NOT_FOUND:' + dependency);
       }
       const now = iso();
       const job = {id: id('job'), kind: 'runtime_job', taskId, key, command: normalized,
         required: !!required, readOnly: !!readOnly, resume, maxRestarts, timeoutMs, completionMode,
-        resources: [...new Set(resources)], operations: [],
+        dependsOn: [...dependsOn], resources: [...new Set(resources)], operations: [],
         gates: [{name: 'process_exit_zero', passed: false, evidence: null},
           ...(completionMode === 'attested' && gates.length === 0 ?
             [{name: 'caller_attestation', passed: false, evidence: null}] : []),
@@ -273,6 +281,12 @@ export class Runtime {
       }
       if (job.state !== 'queued') fail('JOB_NOT_QUEUED');
       if (unknownEffects(job)) fail('OPERATION_RECONCILIATION_REQUIRED');
+      for (const dependency of job.dependsOn || []) {
+        const predecessorId = state.jobKeys[JSON.stringify([job.taskId, dependency])];
+        if (!predecessorId || state.jobs[predecessorId]?.state !== 'completed') {
+          fail('JOB_DEPENDENCIES_PENDING:' + dependency);
+        }
+      }
       for (const resource of job.resources) {
         const owner = state.resources[resource];
         if (owner && owner !== jobId) fail('RESOURCE_BUSY:' + resource);
@@ -307,6 +321,42 @@ export class Runtime {
       });
       throw error;
     }
+  }
+  plan({taskId}) {
+    if (!taskId) fail('TASK_ID_REQUIRED');
+    const state = this.store.read();
+    checkTask(state, taskId);
+    return {taskId, jobs: Object.values(state.jobs).filter(job => job.taskId === taskId).map(job => {
+      const waitingFor = (job.dependsOn || []).filter(key => {
+        const predecessor = state.jobKeys[JSON.stringify([taskId, key])];
+        return !predecessor || state.jobs[predecessor]?.state !== 'completed';
+      });
+      const resourcesBusy = job.resources.filter(key => state.resources[key] && state.resources[key] !== job.id);
+      return {jobId: job.id, key: job.key, state: job.state, dependsOn: job.dependsOn || [],
+        waitingFor, resourcesBusy, ready: job.state === 'queued' && !waitingFor.length && !resourcesBusy.length};
+    })};
+  }
+  runReady({taskId}) {
+    // Explicit, one-shot scheduling: callers invoke this again after evidence
+    // completion. It does not poll, validate outcomes or replay failed jobs.
+    if (!taskId) fail('TASK_ID_REQUIRED');
+    const snapshot = this.store.read();
+    checkTask(snapshot, taskId);
+    const queued = Object.values(snapshot.jobs)
+      .filter(job => job.state === 'queued' && job.taskId === taskId);
+    const started = [];
+    const waiting = [];
+    for (const job of queued) {
+      try {
+        const result = this.start({jobId: job.id});
+        if (!result.alreadyRunning) started.push({jobId: job.id, attemptId: result.attemptId});
+      } catch (error) {
+        if (/^(JOB_DEPENDENCIES_PENDING|RESOURCE_BUSY|JOB_NOT_QUEUED):?/.test(error.message)) {
+          waiting.push({jobId: job.id, reason: error.message});
+        } else throw error;
+      }
+    }
+    return {started, waiting};
   }
   retry({jobId}) {
     return this.store.update(state => {

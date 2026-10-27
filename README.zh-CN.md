@@ -55,7 +55,14 @@ The original CLI process did not need to remain open.
 - **完成验收**：进程退出码为 0 只能进入待验收状态；声明的检查项有明确证据后才能完成。
 - **外部副作用登记**：先记录操作，再执行外部动作；超时或结果不明确时必须核对真实目标，不能自动重复。操作一经确认或中止，重复提交相同结算结果会保留首次证据及时间，不允许悄悄覆盖。
 - **资源互斥**：两个 Job 不会并发使用同一声明的资源。
+- **任务依赖（未发布功能）**：后续 Job 可通过 `dependsOn: ['前置Job的key']` 等待同一 Task 中已登记的前置 Job 完成；`plan` 查看等待原因，`run-ready` 显式启动当前可运行的 Job。
 - **可控重试**：默认人工核对后续跑，明确只读的任务可以选择安全自动恢复。
+
+## 多步骤工作流（开发中，尚未包含在 beta.2 安装包）
+
+先提交上游 Job，再提交下游 Job，例如 `runtime.submit({taskId, key: 'review', command, dependsOn: ['produce']})`。必须是**同一 Task 内已经登记的 Job key**，不能前向引用，不允许循环依赖。随后调用 `runtime.runReady({taskId})`，仅启动依赖已经 `completed` 且资源空闲的排队 Job。上游成功退出但仍处于 `completion_candidate` 时，下游不能启动；真实结果读回后由调用方通过 gate 并 `complete()`，再次调用 `runReady` 才进入下一步。
+
+CLI：`arl plan --root ./state --task TASK_ID` 只读查看可运行与等待项；`arl run-ready --root ./state --task TASK_ID` 执行一次调度，**都必须指定 Task ID**。这不是常驻调度器或自动结果验证；前置任务若使用 `exit_only`，其 `completed` 仍只表示退出码成功。详细说明见[英文 README](README.md)。
 
 ## 默认验收与可选退出码模式
 
