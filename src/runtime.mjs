@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
 import {StateStore, iso, processAlive} from './state.mjs';
 export {runFlow} from './flow.mjs';
+export {ChatContinuationGuard} from './chat-continuation.mjs';
 
 const fail = (message) => { throw new Error(message); };
 const id = (prefix) => prefix + '-' + randomUUID();

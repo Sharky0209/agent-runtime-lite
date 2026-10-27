@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import {readFileSync} from 'node:fs';
-import {Runtime, runFlow} from '../src/runtime.mjs';
+import {Runtime, runFlow, ChatContinuationGuard} from '../src/runtime.mjs';
 
 const parsed = {_: []};
 for (let n = 2; n < process.argv.length; n++) {
@@ -27,6 +27,8 @@ const gateNames = () => {
 };
 const root = typeof parsed.root === 'string' ? parsed.root : process.cwd();
 const runtime = new Runtime(root);
+const chat = new ChatContinuationGuard(root);
+const chatKeys = () => ({taskId:arg('task'),conversationId:arg('conversation'),turnId:arg('turn')});
 const command = parsed._[0];
 const routes = {
   accept: () => runtime.accept({key: arg('key'), title: arg('title'), goal: parsed.goal || ''}),
@@ -56,6 +58,13 @@ const routes = {
   recover: () => runtime.recover(),
   status: () => runtime.status({taskId: parsed.task, jobId: parsed.job}),
   doctor: () => runtime.diagnose(),
+  'chat-watch': () => chat.watch({...chatKeys(),
+    continuationMessage:readFileSync(arg('message-file'),'utf8'),
+    stallMs:parsed['stall-ms'] ? Number(arg('stall-ms')) : 120000,
+    maxContinuationsPerTask:parsed['max-continuations'] ? Number(arg('max-continuations')) : 2}),
+  'chat-observe': () => chat.observe({...chatKeys(),
+    sequence:Number(arg('sequence')),status:arg('state'),progressKey:parsed['progress-key'] || null}),
+  'chat-plan': () => chat.plan(chatKeys()),
   checkpoint: () => runtime.checkpoint({taskId: arg('task'), step: arg('step'), note: parsed.note || ''}),
   'op-begin': () => runtime.beginOperation({jobId: arg('job'), key: arg('key')}),
   'op-confirm': () => runtime.settleOperation({jobId: arg('job'), key: arg('key'), outcome:'confirmed', evidence:arg('evidence')}),
@@ -68,10 +77,16 @@ const usage = `Agent Runtime Lite
 Usage: arl <command> [options]
 
 Commands: accept, submit, start, plan, run-ready, advance, drive, flow, status, checkpoint, op-begin,
-          op-confirm, op-abort, gate, verify-file, complete, retry, recover, doctor, demo
+          op-confirm, op-abort, gate, verify-file, complete, retry, recover, doctor, demo,
+          chat-watch, chat-observe, chat-plan
 
 Global:   --root <directory>  Select a local state directory
 Doctor:   arl doctor --root ./state  (read-only, share-safe counts)
+Chat:     arl chat-watch --task TASK --conversation CID --turn TURN --message-file continue.txt
+          arl chat-observe --task TASK --conversation CID --turn TURN --sequence 1 --state active
+          arl chat-plan --task TASK --conversation CID --turn TURN (read-only)
+          For actual continuation import ChatContinuationGuard with a verified adapter;
+          the CLI never sends a ChatGPT message.
 Demo:     arl demo  Run a disposable real-file handoff and verification
           --help, help        Print this help
           --version, version  Print installed version

@@ -118,6 +118,14 @@ Final job state: completed
 
 运行状态默认写入指定工作目录的 `.arl/`，自动化测试只使用独立临时目录。
 
+## Chat 模式停滞检测与安全续接（源码新增，尚未发布）
+
+新增 `ChatContinuationGuard`，可给**已确认会话与轮次**记录实际输出进展、检测长时间无进展、在独立读回确认原轮次已失败／超时／中断后，按预设文本接续一次。**长时间思考但仍处于 active 状态不会触发发送**；轮询本身也不算进展。
+
+通过 `arl chat-watch --task TASK_ID --conversation CID --turn TURN --message-file continue.txt` 建立监测，`chat-observe --sequence 1 --state active --progress-key STREAM_ID` 记录实际进展，`chat-plan` 查看只读判定。所有命令须指定 `--root`。实际发送只能由开发者在自有程序中导入 `ChatContinuationGuard`，并提供已授权的 `readTurn`／`sendContinuation`／`readDelivery` 适配器；普通 CLI **不会自行发送 ChatGPT 消息**。
+
+发送必须同时满足：精确的 conversation/turn/head 身份已核验；服务端明确显示该轮为终止失败；适配器确实支持**发送时原子核对当前 head**与**跨重启持久幂等**。不支持这些保证时，默认拒绝自动发送。先持久化操作预留再发送，超时或断线时不盲目重发，回执仍需独立查证；默认每任务至多两次接续，单个中断轮次仅一次。**目前只完成模拟适配器的自动续接测试；尚未对真实 ChatGPT Chat 模式完成端到端自动发送验收。** 详细约束见 [英文 README](README.md#safe-chat-mode-continuation-guard-new-unreleased)。
+
 ## 适用范围
 
 当前是**单机本地框架**，适合给自建 Agent、任务型 CLI、个人自动化工具增加可续接任务状态。它不是分布式消息队列，不包含浏览器自动化、模型服务，也不能自动判断第三方业务是否真的完成。
