@@ -99,6 +99,20 @@ node bin/arl.mjs status --root . --task TASK_ID
 
 For portable JSON arguments without shell escaping issues, supply a JSON file via `--command-file ./command.json` and a single gate with `--gate report_readback`. See the **tested PowerShell and Bash scripts** in the [quickstart](docs/QUICKSTART.md). A running job creates a detached worker and records a log in `.arl/logs/`. Successful OS exit moves the job into `completion_candidate`; it does **not** complete automatically.
 
+## One-command verified workflows (new, unreleased)
+
+Instead of manually copying task/job IDs between commands, describe ordered steps once in a JSON file and drive the flow with a **single CLI invocation**:
+
+```sh
+node bin/arl.mjs flow --root ./trial-workspace --flow-file ./examples/verified-workflow.json --wait-ms 10000
+```
+
+The [example manifest](examples/verified-workflow.json) creates two real Node.js jobs. The first writes `report.json`, the second reads it and writes `summary.json`; each stage requires runtime-checked JSON fields before it can complete. The command returns the task ID, per-job IDs, started/auto-completed steps, remaining reviews and final state. A second run with the same manifest and root reuses the same stable task/job keys, rather than rerunning completed work. Import is durable: an interrupted multi-step setup can be resumed by providing the same manifest again.
+
+Use `arl drive --root ./trial-workspace --task TASK_ID --wait-ms 10000` to continue an already registered task without supplying the manifest. For integrations, import `{runFlow, Runtime}` and call `await runFlow(runtime, manifest)`. Each drive call is bounded to 30 seconds; if a child is still executing, call it again later. Jobs needing caller-supplied gates, exit-only confirmation, or reconciliation of external effects remain pending for explicit review; a failed or mismatched output is never silently accepted. The command does not run a background service, replay failed jobs or verify external destinations. Unlike `arl demo`, this uses your selected persistent `--root` and does **not** delete it.
+
+The feature is currently on the repository source branch; it is **not** in the immutable `v0.2.0-beta.2` Release archive.
+
 ## Multi-step workflows (new, unreleased)
 
 Submit jobs in dependency order using keys within the **same task**. `dependsOn` is persisted and immutable for idempotent submissions; forward references and circular graphs are rejected by requiring each predecessor to exist first. Existing jobs without dependencies continue to work.
@@ -116,7 +130,7 @@ r.runReady({taskId}); // now starts review, exactly once
 
 The commands above assume `r` is a `Runtime` instance and `producerCommand` / `reviewerCommand` are your real `{exe, args}` commands. Wait for `completion_candidate` before passing evidence. `runReady` is **one-shot**, not a background daemon: invoke it again after each completed stage. `r.plan({taskId})` is read-only and shows ready, waiting-for-dependency and resource-busy jobs. From the CLI: `arl plan --root ./state --task TASK_ID` and `arl run-ready --root ./state --task TASK_ID`. Always specify the task ID. `plan` can include task/job keys, so unlike `doctor` it is not share-safe.
 
-A dependency requires its predecessor to be marked `completed`. If that predecessor was deliberately configured as `exit_only`, this is **not independent evidence** of its external outcome. Failed predecessors never unlock downstream work. This feature does not automatically verify output, retry external effects or run an always-on scheduler.
+A dependency requires its predecessor to be marked `completed`. If that predecessor was deliberately configured as `exit_only`, this is **not independent evidence** of its external outcome. Failed predecessors never unlock downstream work. The one-shot `runReady` feature does not automatically verify output, retry external effects or run an always-on scheduler. For file-only jobs, the separate `drive` feature can now perform the readback and advance the dependency chain.
 
 ## Runtime-checked local output (new, unreleased)
 

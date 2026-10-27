@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import {readFileSync} from 'node:fs';
-import {Runtime} from '../src/runtime.mjs';
+import {Runtime, runFlow} from '../src/runtime.mjs';
 
 const parsed = {_: []};
 for (let n = 2; n < process.argv.length; n++) {
@@ -44,6 +44,13 @@ const routes = {
   }),
   start: () => runtime.start({jobId: arg('job')}),
   'run-ready': () => runtime.runReady({taskId: arg('task')}),
+  advance: () => runtime.advance({taskId: arg('task')}),
+  drive: () => runtime.drive({taskId: arg('task'),
+    waitMs: parsed['wait-ms'] ? Number(arg('wait-ms')) : 10000,
+    pollMs: parsed['poll-ms'] ? Number(arg('poll-ms')) : 100}),
+  flow: () => runFlow(runtime, json(readFileSync(arg('flow-file'), 'utf8')),
+    {waitMs: parsed['wait-ms'] ? Number(arg('wait-ms')) : 10000,
+      pollMs: parsed['poll-ms'] ? Number(arg('poll-ms')) : 100}),
   plan: () => runtime.plan({taskId: arg('task')}),
   retry: () => runtime.retry({jobId: arg('job')}),
   recover: () => runtime.recover(),
@@ -60,7 +67,7 @@ const routes = {
 const usage = `Agent Runtime Lite
 Usage: arl <command> [options]
 
-Commands: accept, submit, start, plan, run-ready, status, checkpoint, op-begin,
+Commands: accept, submit, start, plan, run-ready, advance, drive, flow, status, checkpoint, op-begin,
           op-confirm, op-abort, gate, verify-file, complete, retry, recover, doctor, demo
 
 Global:   --root <directory>  Select a local state directory
@@ -82,6 +89,11 @@ Submit:   --task <id> --key <name>
 Readback: arl verify-file --root ./demo --job JOB_ID
           Checks real local JSON content for a declared --file-check gate.
 
+One-step: arl flow --root ./demo --flow-file ./workflow.json
+          Reuse named jobs on repeat invocation; drives local checks.
+Driver:   arl drive --root ./demo --task TASK_ID --wait-ms 10000
+          Advances only local-file-checked jobs; manual gates still wait.
+          arl advance --root ./demo --task TASK_ID  (single pass)
 Workflow: arl plan --root ./demo --task TASK_ID   (read-only readiness)
           arl run-ready --root ./demo --task TASK_ID
           Start queued jobs whose predecessors completed; repeat after evidence.
@@ -97,7 +109,7 @@ try {
     console.log(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
   } else {
     if (!routes[command]) throw Error('UNKNOWN_COMMAND: ' + String(command) + '\n' + usage);
-    console.log(JSON.stringify(routes[command](), null, 2));
+    console.log(JSON.stringify(await routes[command](), null, 2));
   }
 } catch (error) {
   console.error(JSON.stringify({error: error.message}));

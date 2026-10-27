@@ -29,6 +29,14 @@ Read-only `plan({taskId})` reports readiness and dependencies/resources holding 
 
 The state is persisted as an atomic JSON snapshot and synchronized with a local lock. The approach is deliberately simple and works best with small to medium local agent workloads.
 
+## Bounded evidence-driven workflow execution (unreleased)
+
+`advance({taskId})` makes one scheduling pass: for each `completion_candidate` with a local-file-only gate and no unresolved operations, it performs `verifyFile()`, calls `complete()`, and only then attempts queued dependent jobs with `runReady()`. It reports pending caller gates, mismatched/missing files, running jobs and failed jobs without falsely changing their state. It never attests jobs that require manual evidence, runs `exit_only` jobs to completion automatically, or retries blocked/failed jobs.
+
+`drive({taskId,waitMs,pollMs})` repeats these passes for a bounded interval (maximum 30 seconds) while child processes are active, then returns a resumable structured result. The source/package CLI supports `arl drive` for existing jobs and `arl flow --flow-file` for a declarative manifest; `runFlow` registers steps in dependency order using stable task/job keys before driving. Basic manifest shape/dependency ordering is checked up front, while each job's validation and registration happen in order. A failed import may leave an already-registered prefix, which the same manifest can safely reuse on retry; conflicting changed job payloads are rejected by the existing stable-key contract.
+
+This deliberately improves local workflow ergonomics but is not a hosted scheduler, indefinite watchdog, proof of remote business outcomes, or guarantee a previously existing file was produced in the latest attempt.
+
 ## Runtime-owned local file evidence (unreleased)
 
 An optional `fileCheck: {path, jsonFields}` is an immutable job contract for expected JSON fields in a local file under the runtime root. It requires `attested` mode and installs a reserved `local_file_check` gate, which `passGate()` cannot set. `verifyFile({jobId})` actually opens, parses and compares the named top-level fields while the state transition is locked. `complete()` repeats this readback immediately before committing the final state, so evidence cannot remain valid after an ordinary intervening file mutation. Retrying an execution resets the gate.
@@ -52,7 +60,7 @@ The library cannot know what an application actually wrote. The caller records t
 ## Design limits
 
 - Single local host only. The lock is not a distributed lock.
-- No timer-based or autonomous scheduling or long-lived service watchdog. `runReady` is an explicit one-shot dispatcher.
+- No autonomous timer-based scheduling or long-lived watchdog. `runReady` dispatches once; `drive` only polls during its explicit bounded invocation.
 - No built-in remote application integrations.
 - External-business evidence is supplied by a caller; the optional built-in local JSON check verifies only explicitly named fields in one local file, not arbitrary systems.
 - No guarantee that an arbitrary command is safe to rerun, even if a user marks it read-only.

@@ -95,6 +95,16 @@ Use the returned `task.id` and `job.id` as `TASK_ID` and `JOB_ID`. Wait for `com
 
 A new job defaults to mandatory caller evidence: if you omit `--gate`, the required gate is named `caller_attestation`; if you use `--gate`, that custom evidence gate is sufficient and there is no duplicate attestation step. To intentionally use exit-code-only semantics, supply `--completion-mode exit_only` and no custom gates; results are **unverified**. Old stored jobs preserve old gates; see [v0.2 migration](MIGRATION_V02.md).
 
+## One-command two-stage workflow (unreleased source checkout)
+
+Use the included [workflow manifest](../examples/verified-workflow.json) and run from the repository directory:
+
+```sh
+node bin/arl.mjs flow --root ./trial-workspace --flow-file ./examples/verified-workflow.json --wait-ms 10000
+```
+
+The two processes really write `report.json` and `summary.json` inside `trial-workspace`. Each stage is independently read back by the runtime before it can unlock its successor. Rerunning the exact same command retains previous completion records; it does not execute completed jobs a second time. To continue a pre-registered task, call `node bin/arl.mjs drive --root ./trial-workspace --task TASK_ID`. A bounded call can end while a child is still running: rerun the driver. Human evidence gates and uncertain external operations require explicit review; there is no background scheduler. Do not mistake the current source feature for the already-published beta.2 archive.
+
 ## Multi-step jobs from the checkout (unreleased)
 
 The source checkout now offers same-task dependent jobs. Submit a first Job with `--key produce`, then a second using `--key inspect --depends-on '["produce"]'` (also supplying `--task` and `--command-file`). The predecessor must be registered before the dependent. Inspect with `node bin/arl.mjs plan --root ./my-agent-state --task TASK_ID`, then dispatch once using `node bin/arl.mjs run-ready --root ./my-agent-state --task TASK_ID`. Check actual results, pass the first Job's gate and complete it before running `run-ready` again to launch `inspect`. These commands do not auto-verify output, and `run-ready` does not run continuously. See the [README workflow guide](../README.md#multi-step-workflows-new-unreleased).

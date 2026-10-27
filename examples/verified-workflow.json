@@ -1,0 +1,35 @@
+{
+  "key": "verified-two-stage-example",
+  "title": "Generate and verify two local JSON reports",
+  "jobs": [
+    {
+      "key": "produce",
+      "command": {
+        "exe": "node",
+        "args": [
+          "-e",
+          "require('node:fs').writeFileSync('report.json',JSON.stringify({items:2,total:5}))"
+        ]
+      },
+      "fileCheck": {
+        "path": "report.json",
+        "jsonFields": {"items": 2, "total": 5}
+      }
+    },
+    {
+      "key": "summarize",
+      "dependsOn": ["produce"],
+      "command": {
+        "exe": "node",
+        "args": [
+          "-e",
+          "const fs=require('node:fs');const x=JSON.parse(fs.readFileSync('report.json','utf8'));fs.writeFileSync('summary.json',JSON.stringify({total:x.total}))"
+        ]
+      },
+      "fileCheck": {
+        "path": "summary.json",
+        "jsonFields": {"total": 5}
+      }
+    }
+  ]
+}

@@ -41,6 +41,7 @@ try{
   assert.match(help,/arl demo/);
   assert.match(help,/run-ready/);
   assert.match(help,/verify-file/);
+  assert.match(help,/arl flow/);
   const installedVersion=JSON.parse(fs.readFileSync(path.join(client,'node_modules','agent-runtime-lite','package.json'),'utf8')).version;
   assert.equal(cli(bin,['--version']),installedVersion);
   // This runs the real detached worker and separate CLI callers from the installed package.
@@ -58,8 +59,8 @@ try{
   assert.equal(missing.status,1);
   assert.match(missing.stderr,/MISSING --key/);
   const exported=run(process.execPath,['--input-type=module','-e',
-    'import {Runtime} from "agent-runtime-lite"; console.log(typeof Runtime)'],client);
-  assert.equal(exported,'function');
+    'import {Runtime,runFlow} from "agent-runtime-lite"; console.log(typeof Runtime + "," + typeof runFlow)'],client);
+  assert.equal(exported,'function,function');
   const accepted=JSON.parse(cli(bin,['accept','--root',runtimeRoot,'--key','package-test',
     '--title','Separate consumer']));
   const commandFile=path.join(client,'command.json');
@@ -152,10 +153,34 @@ try{
   assert.equal(diagnosis.counts.jobs,3);
   assert.equal(diagnosis.jobsByState.completed,3);
   assert.equal(diagnosis.counts.reservedResources,0);
+  // Installed one-command declarative import + evidence-checked progression.
+  const manifestFile=path.join(client,'flow.json');
+  const flowRoot=path.join(root,'declarative-state');
+  fs.writeFileSync(manifestFile,JSON.stringify({key:'installed-flow',title:'Packaged flow',jobs:[
+    {key:'make',command:{exe:process.execPath,args:['-e',
+      'require("node:fs").writeFileSync("one.json",JSON.stringify({total:3}))']},
+      fileCheck:{path:'one.json',jsonFields:{total:3}}},
+    {key:'follow',dependsOn:['make'],command:{exe:process.execPath,args:['-e',
+      'const fs=require("node:fs");const x=JSON.parse(fs.readFileSync("one.json","utf8"));fs.writeFileSync("two.json",JSON.stringify({total:x.total+2}))']},
+      fileCheck:{path:'two.json',jsonFields:{total:5}}}
+  ]}));
+  const flowed=JSON.parse(cli(bin,['flow','--root',flowRoot,'--flow-file',manifestFile,
+    '--wait-ms','12000','--poll-ms','80']));
+  assert.equal(flowed.taskState,'completed');
+  assert.equal(flowed.autoCompleted.length,2);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(flowRoot,'two.json'),'utf8')).total,5);
+  const secondFlow=JSON.parse(cli(bin,['flow','--root',flowRoot,'--flow-file',manifestFile,
+    '--wait-ms','0']));
+  assert.equal(secondFlow.deduplicated,true);
+  assert.deepEqual(secondFlow.started,[]);
+  assert.ok(secondFlow.jobs.every(item => {
+    const result=JSON.parse(cli(bin,['status','--root',flowRoot,'--job',item.jobId]));
+    return result.job.attempts.length===1;
+  }));
   console.log('PACKAGE_INSTALL_PASS',JSON.stringify({
     version:installedVersion,platform:process.platform,cliShim:true,
     exportResolved:true,helpVerified:true,negativeExitCodes:true,
-    realChildExecuted:true,evidenceGateEnforced:true,workflowDependency:true,verifiedFile:true,attempts:3}));
+    realChildExecuted:true,evidenceGateEnforced:true,workflowDependency:true,verifiedFile:true,declarativeFlow:true,attempts:3}));
 } finally {
   fs.rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:150});
 }
