@@ -33,6 +33,7 @@ const routes = {
   submit: () => runtime.submit({
     taskId: arg('task'), key: arg('key'), command: commandInput(),
     resources: parsed.resources ? json(parsed.resources) : [],
+    dependsOn: parsed['depends-on'] ? json(arg('depends-on')) : [],
     gates: gateNames(),
     readOnly: parsed['read-only'] === true,
     resume: parsed.resume || 'manual',
@@ -41,6 +42,8 @@ const routes = {
     completionMode: parsed['completion-mode'] || 'attested'
   }),
   start: () => runtime.start({jobId: arg('job')}),
+  'run-ready': () => runtime.runReady({taskId: arg('task')}),
+  plan: () => runtime.plan({taskId: arg('task')}),
   retry: () => runtime.retry({jobId: arg('job')}),
   recover: () => runtime.recover(),
   status: () => runtime.status({taskId: parsed.task, jobId: parsed.job}),
@@ -55,7 +58,7 @@ const routes = {
 const usage = `Agent Runtime Lite
 Usage: arl <command> [options]
 
-Commands: accept, submit, start, status, checkpoint, op-begin,
+Commands: accept, submit, start, plan, run-ready, status, checkpoint, op-begin,
           op-confirm, op-abort, gate, complete, retry, recover, doctor, demo
 
 Global:   --root <directory>  Select a local state directory
@@ -68,9 +71,14 @@ Submit:   --task <id> --key <name>
           --command <JSON>  OR  --command-file <JSON file>
           --gate <name>     OR  --gates <JSON array>
           --resources <JSON array>  (optional)
+          --depends-on <JSON array of preceding job keys>  (optional)
           --completion-mode attested|exit_only  (default: attested)
           Default: caller must pass --name caller_attestation with evidence
           exit_only: explicit, unverified process-exit semantics (no --gate)
+
+Workflow: arl plan --root ./demo --task TASK_ID   (read-only readiness)
+          arl run-ready --root ./demo --task TASK_ID
+          Start queued jobs whose predecessors completed; repeat after evidence.
 
 Example:  arl accept --root ./demo --key hello --title Hello
 Docs:     https://github.com/Sharky0209/agent-runtime-lite`;

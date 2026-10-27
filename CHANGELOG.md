@@ -4,6 +4,9 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Add explicit same-task Job dependencies, read-only readiness planning and one-shot `run-ready` scheduling after completed predecessors; preserve evidence gates, resource reservations and the existing completion contract.
+- Add real two-step cross-CLI acceptance tests and installed-package workflow smoke coverage; no background scheduler or new release implied.
+
 - Preserve the first recorded settlement evidence and timestamp when an external operation is confirmed or aborted more than once; matching retries return the original result without rewriting the audit trail.
 - Make npm publication opt-in and beta-tagged, with a safe validate-only default, explicit package file audit and post-publish version readback.
 - Update GitHub Actions to newer Node.js 24-based action runtimes and disable unnecessary package manager caching; retain Node.js 20/22 compatibility checks.

@@ -62,6 +62,7 @@ Agent conversations can end before the work does. A child process exiting succes
 - **Operation:** a potentially external effect, marked uncertain before dispatch and confirmed only after readback.
 - **Completion gate:** a named piece of evidence required before completion.
 - **Resource reservation:** prevents two jobs from using the same declared write target concurrently.
+- **Evidence-gated dependencies:** a job may declare previously submitted job keys in `dependsOn`; it cannot launch until all of them reach `completed`. Use `plan` and explicit `run-ready` to move a workflow forward.
 
 This release is intentionally a **single-host local runtime**, not a distributed orchestration service.
 
@@ -97,6 +98,25 @@ node bin/arl.mjs status --root . --task TASK_ID
 ```
 
 For portable JSON arguments without shell escaping issues, supply a JSON file via `--command-file ./command.json` and a single gate with `--gate report_readback`. See the **tested PowerShell and Bash scripts** in the [quickstart](docs/QUICKSTART.md). A running job creates a detached worker and records a log in `.arl/logs/`. Successful OS exit moves the job into `completion_candidate`; it does **not** complete automatically.
+
+## Multi-step workflows (new, unreleased)
+
+Submit jobs in dependency order using keys within the **same task**. `dependsOn` is persisted and immutable for idempotent submissions; forward references and circular graphs are rejected by requiring each predecessor to exist first. Existing jobs without dependencies continue to work.
+
+```js
+const taskId = r.accept({key: 'report-flow', title: 'Produce then review'}).task.id;
+const report = r.submit({taskId, key: 'produce', command: producerCommand}).job;
+const review = r.submit({taskId, key: 'review', dependsOn: ['produce'], command: reviewerCommand}).job;
+r.runReady({taskId}); // starts produce, not review
+// After produce exits zero: independently inspect the report output.
+r.passGate({jobId: report.id, name: 'caller_attestation', evidence: 'Report read back and checked'});
+r.complete({jobId: report.id});
+r.runReady({taskId}); // now starts review, exactly once
+```
+
+The commands above assume `r` is a `Runtime` instance and `producerCommand` / `reviewerCommand` are your real `{exe, args}` commands. Wait for `completion_candidate` before passing evidence. `runReady` is **one-shot**, not a background daemon: invoke it again after each completed stage. `r.plan({taskId})` is read-only and shows ready, waiting-for-dependency and resource-busy jobs. From the CLI: `arl plan --root ./state --task TASK_ID` and `arl run-ready --root ./state --task TASK_ID`. Always specify the task ID. `plan` can include task/job keys, so unlike `doctor` it is not share-safe.
+
+A dependency requires its predecessor to be marked `completed`. If that predecessor was deliberately configured as `exit_only`, this is **not independent evidence** of its external outcome. Failed predecessors never unlock downstream work. This feature does not automatically verify output, retry external effects or run an always-on scheduler.
 
 ## JavaScript API
 
