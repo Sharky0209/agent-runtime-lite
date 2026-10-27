@@ -212,7 +212,8 @@ export class Runtime {
       const job = checkJob(state, jobId);
       const op = job.operations.find(v => v.key === key);
       if (!op) fail('OPERATION_NOT_FOUND');
-      if (op.state !== 'uncertain' && op.state !== outcome) fail('OPERATION_ALREADY_SETTLED');
+      if (op.state === outcome) return copy(op);
+      if (op.state !== 'uncertain') fail('OPERATION_ALREADY_SETTLED');
       op.state = outcome;
       op.evidence = String(evidence);
       op.settledAt ||= iso();
