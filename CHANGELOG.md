@@ -4,6 +4,9 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Add an optional runtime-owned local JSON output check: actual field readback, a non-manually-passable file gate, and a second readback immediately before completion. Report local verification separately from caller attestation; allow both together without changing legacy/default jobs.
+- Cover real file output, malformed/missing/mismatched results, after-check file mutation, downstream job gating and installed CLI verification. Not a claim of remote-service verification or a published package.
+
 - Add explicit same-task Job dependencies, read-only readiness planning and one-shot `run-ready` scheduling after completed predecessors; preserve evidence gates, resource reservations and the existing completion contract.
 - Add real two-step cross-CLI acceptance tests and installed-package workflow smoke coverage; no background scheduler or new release implied.
 

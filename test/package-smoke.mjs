@@ -40,6 +40,7 @@ try{
   assert.match(help,/submit/);
   assert.match(help,/arl demo/);
   assert.match(help,/run-ready/);
+  assert.match(help,/verify-file/);
   const installedVersion=JSON.parse(fs.readFileSync(path.join(client,'node_modules','agent-runtime-lite','package.json'),'utf8')).version;
   assert.equal(cli(bin,['--version']),installedVersion);
   // This runs the real detached worker and separate CLI callers from the installed package.
@@ -117,18 +118,44 @@ try{
   JSON.parse(cli(bin,['gate','--root',runtimeRoot,'--job',dependent.id,'--name','caller_attestation',
     '--evidence','Follow-up installed child log independently checked']));
   JSON.parse(cli(bin,['complete','--root',runtimeRoot,'--job',dependent.id]));
+  // The installed package must read and verify actual JSON fields without
+  // taking a caller's unverifiable evidence string as the file check.
+  const checkedCommand=path.join(client,'verified-command.json');
+  fs.writeFileSync(checkedCommand,JSON.stringify({exe:process.execPath,
+    args:['-e','require("node:fs").writeFileSync("checked.json",JSON.stringify({items:2,total:5,extra:true}))']}));
+  const checked=JSON.parse(cli(bin,['submit','--root',runtimeRoot,'--task',accepted.task.id,
+    '--key','checked-file','--command-file',checkedCommand,'--depends-on','["follow-up"]',
+    '--file-check','{"path":"checked.json","jsonFields":{"total":5,"items":2}}'])).job;
+  assert.deepEqual(checked.gates.map(g=>g.name),['process_exit_zero','local_file_check']);
+  const checkedStarted=JSON.parse(cli(bin,['run-ready','--root',runtimeRoot,'--task',accepted.task.id]));
+  assert.equal(checkedStarted.started.length,1);
+  assert.equal(checkedStarted.started[0].jobId,checked.id);
+  let checkedCandidate;
+  for(let i=0;i<100;i++){
+    const current=JSON.parse(cli(bin,['status','--root',runtimeRoot,'--job',checked.id])).job;
+    if (current.state==='completion_candidate') {checkedCandidate=current;break;}
+    if (current.state==='failed'||current.state==='blocked') throw Error('Installed file-check worker failed: '+current.blockReason);
+    await pause(70);
+  }
+  assert.ok(checkedCandidate,'installed file-check child did not reach completion candidate');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(runtimeRoot,'checked.json'),'utf8')).total,5);
+  const checkedReadback=JSON.parse(cli(bin,['verify-file','--root',runtimeRoot,'--job',checked.id]));
+  assert.equal(checkedReadback.checkedFields,2);
+  assert.equal(checkedReadback.gate.source,'runtime_local_file_readback');
+  assert.equal(JSON.parse(cli(bin,['complete','--root',runtimeRoot,'--job',checked.id])).job.completionBasis,
+    'local_file_checked');
   const status=JSON.parse(cli(bin,['status','--root',runtimeRoot,'--task',accepted.task.id]));
   assert.equal(status.task.state,'completed');
-  assert.equal(status.jobs.length,2);
+  assert.equal(status.jobs.length,3);
   assert.ok(status.jobs.every(job=>job.attempts.length===1));
   const diagnosis=JSON.parse(cli(bin,['doctor','--root',runtimeRoot]));
-  assert.equal(diagnosis.counts.jobs,2);
-  assert.equal(diagnosis.jobsByState.completed,2);
+  assert.equal(diagnosis.counts.jobs,3);
+  assert.equal(diagnosis.jobsByState.completed,3);
   assert.equal(diagnosis.counts.reservedResources,0);
   console.log('PACKAGE_INSTALL_PASS',JSON.stringify({
     version:installedVersion,platform:process.platform,cliShim:true,
     exportResolved:true,helpVerified:true,negativeExitCodes:true,
-    realChildExecuted:true,evidenceGateEnforced:true,workflowDependency:true,attempts:2}));
+    realChildExecuted:true,evidenceGateEnforced:true,workflowDependency:true,verifiedFile:true,attempts:3}));
 } finally {
   fs.rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:150});
 }
