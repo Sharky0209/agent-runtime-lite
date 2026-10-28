@@ -4,6 +4,12 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Expose a read-only `nextAction` per job in `plan`, giving users an explicit next step across queued, executing, verification, uncertain-operation and failed states.
+- Supply `ARL_ROOT`, `ARL_TASK_ID`, `ARL_JOB_ID`, and `ARL_ATTEMPT_ID` to launched child commands for direct operation registration and integration without manually threading job IDs.
+- Add opt-in `fileCheck.fresh` to reject unchanged matching artifacts from previous attempts at both verification and final completion; preserve old content-only contracts by default.
+- Include a runnable local-receiver operation integration example, usage guide, and explicit stale/fresh and installed-package regressions. The example does not claim remote delivery.
+
+
 - Add bounded evidence-driven job progression (`advance` / `drive`) and declarative JSON manifest entrypoint (`flow`) with stable-key rerun/recovery. Only automatically confirm jobs whose local file checks pass without extra caller gates; return actionable pending-review states for all others.
 - Include an actual two-stage JSON workflow example, cross-process single-call execution tests and installed-package smoke coverage. No new npm package, background daemon or remote outcome verifier is implied.
 

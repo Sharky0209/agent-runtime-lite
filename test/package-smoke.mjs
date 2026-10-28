@@ -29,6 +29,7 @@ try{
   const included=pack.files.map(f=>f.path);
   for(const required of ['package.json','LICENSE','bin/arl.mjs','src/runtime.mjs','src/worker.mjs'])
     assert.ok(included.includes(required),'missing from archive: '+required);
+  assert.ok(included.includes('examples/integrated-job.mjs'), 'integration example not packed');
   assert.ok(!included.some(p=>p.startsWith('.arl/')||p.startsWith('test/')||p.endsWith('.env')));
   const tarball=path.join(root,pack.filename);
   run('npm',['install','--offline','--ignore-scripts','--no-audit','--no-fund','--no-save',tarball],client);
@@ -47,6 +48,10 @@ try{
   // This runs the real detached worker and separate CLI callers from the installed package.
   // It is the friction-free first action advertised to prospective users.
   assert.match(cli(bin,['demo']),/DEMO_REAL_FILE_READBACK_PASS/);
+  const installedIntegration = path.join(client,'node_modules','agent-runtime-lite','examples','integrated-job.mjs');
+  const integration = JSON.parse(run(process.execPath,[installedIntegration],client,18000));
+  assert.equal(integration.taskState,'completed');
+  assert.equal(integration.receiverConfirmed,true);
   const emptyDiagnosis=JSON.parse(cli(bin,['doctor','--root',runtimeRoot]));
   assert.equal(emptyDiagnosis.initialized,false);
   assert.equal(emptyDiagnosis.counts.jobs,0);

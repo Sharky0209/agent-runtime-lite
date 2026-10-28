@@ -109,7 +109,7 @@ One-step: arl flow --root ./demo --flow-file ./workflow.json
 Driver:   arl drive --root ./demo --task TASK_ID --wait-ms 10000
           Advances only local-file-checked jobs; manual gates still wait.
           arl advance --root ./demo --task TASK_ID  (single pass)
-Workflow: arl plan --root ./demo --task TASK_ID   (read-only readiness)
+Workflow: arl plan --root ./demo --task TASK_ID   (read-only readiness + nextAction)
           arl run-ready --root ./demo --task TASK_ID
           Start queued jobs whose predecessors completed; repeat after evidence.
 

@@ -3,7 +3,7 @@
 [![Cross-platform tests](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[5-minute quickstart](docs/QUICKSTART.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Independent trial kit](docs/LAUNCH.md) · [npm beta publishing](docs/NPM_PUBLISHING.md) · [Changelog](CHANGELOG.md)
+[5-minute quickstart](docs/QUICKSTART.md) · [Practical integration](docs/INTEGRATION.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Independent trial kit](docs/LAUNCH.md) · [npm beta publishing](docs/NPM_PUBLISHING.md) · [Changelog](CHANGELOG.md)
 
 **Your agent's CLI session ended. Did its task actually finish?**
 
@@ -141,6 +141,18 @@ Before external send, the guard durably reserves the operation key. Accepted sub
 
 **Current scope:** the state machine, idempotency and negative cases are tested with simulated providers, **not** against a real ChatGPT Chat account. The project does not include a built-in authorized ChatGPT adapter and cannot spontaneously send a new user turn from inside an ordinary ChatGPT chat. Your existing authenticated transport, verified current conversation/turn ID, explicit send permission, and authoritative provider readback are required. Until those guarantees are independently verified, this guard only detects and reports suspected stalls; it does not automatically send. Do not store secrets in the continuation message.
 
+## Worker context and fresh artifacts (new, unreleased)
+
+The runtime now passes `ARL_ROOT`, `ARL_TASK_ID`, `ARL_JOB_ID`, and `ARL_ATTEMPT_ID` into each launched command. A real worker can call `Runtime` with its own IDs to reserve a potentially external operation **before** the effect, then settle it only after inspecting the destination. There is no need to manually copy job IDs into child scripts.
+
+For local JSON reports, add `fresh: true` to a `fileCheck` to reject a matching but unchanged report left from an earlier attempt (`FILE_CHECK_STALE`). The check compares the file modification time with the current attempt's start time at verification and completion. It is **optional and backward compatible**, and modification time alone does not prove which process wrote the file or that a remote recipient received anything.
+
+```sh
+npm run demo:integration
+```
+
+This runs a real child that registers a delivery operation, writes a **local simulated recipient receipt**, reads it back and confirms the operation before the runtime verifies a fresh output file. The entire example runs in a disposable directory without network access or credentials. See the [integration guide](docs/INTEGRATION.md) for the API and limitations. Not included in the released beta.2 archive.
+
 ## Multi-step workflows (new, unreleased)
 
 Submit jobs in dependency order using keys within the **same task**. `dependsOn` is persisted and immutable for idempotent submissions; forward references and circular graphs are rejected by requiring each predecessor to exist first. Existing jobs without dependencies continue to work.
@@ -156,7 +168,7 @@ r.complete({jobId: report.id});
 r.runReady({taskId}); // now starts review, exactly once
 ```
 
-The commands above assume `r` is a `Runtime` instance and `producerCommand` / `reviewerCommand` are your real `{exe, args}` commands. Wait for `completion_candidate` before passing evidence. `runReady` is **one-shot**, not a background daemon: invoke it again after each completed stage. `r.plan({taskId})` is read-only and shows ready, waiting-for-dependency and resource-busy jobs. From the CLI: `arl plan --root ./state --task TASK_ID` and `arl run-ready --root ./state --task TASK_ID`. Always specify the task ID. `plan` can include task/job keys, so unlike `doctor` it is not share-safe.
+The commands above assume `r` is a `Runtime` instance and `producerCommand` / `reviewerCommand` are your real `{exe, args}` commands. Wait for `completion_candidate` before passing evidence. `runReady` is **one-shot**, not a background daemon: invoke it again after each completed stage. `r.plan({taskId})` is read-only and shows readiness, blockers and a per-job `nextAction` (such as `run-ready`, `verify-file`, `reconcile-operation`, `review-and-gate`, or `complete`). From the CLI: `arl plan --root ./state --task TASK_ID` and `arl run-ready --root ./state --task TASK_ID`. Always specify the task ID. `plan` can include task/job keys, so unlike `doctor` it is not share-safe.
 
 A dependency requires its predecessor to be marked `completed`. If that predecessor was deliberately configured as `exit_only`, this is **not independent evidence** of its external outcome. Failed predecessors never unlock downstream work. The one-shot `runReady` feature does not automatically verify output, retry external effects or run an always-on scheduler. For file-only jobs, the separate `drive` feature can now perform the readback and advance the dependency chain.
 
@@ -168,7 +180,7 @@ For tasks producing local JSON, `fileCheck` gives the runtime a **concrete readb
 const taskId = r.accept({key: 'checked-report', title: 'Build a checked report'}).task.id;
 const {job} = r.submit({
   taskId, key: 'report', command: reportCommand,
-  fileCheck: {path: 'report.json', jsonFields: {status: 'ready', count: 3}}
+  fileCheck: {path: 'report.json', jsonFields: {status: 'ready', count: 3}, fresh: true}
 });
 r.start({jobId: job.id});
 // Wait for completion_candidate; the worker must actually write report.json.
@@ -177,7 +189,7 @@ r.complete({jobId: job.id});   // rechecks the file before storing completion
 // completionBasis is local_file_checked, not caller_attested.
 ```
 
-From the CLI, pass `--file-check '{"path":"report.json","jsonFields":{"status":"ready","count":3}}'` when submitting, then use `arl verify-file --root ./state --job JOB_ID` after successful process exit. The CLI option is a JSON argument; PowerShell and Bash quoting differ. The path resolves relative to the runtime `--root` directory; the command must write there (or use an explicit matching location). Matching fields must have identical JSON values, though other fields may exist. A missing, invalid, or mismatched file never passes the gate. Unlike a manually passed gate, `local_file_check` cannot be satisfied with a caller-provided string.
+From the CLI, pass `--file-check '{"path":"report.json","jsonFields":{"status":"ready","count":3}}'` when submitting, then use `arl verify-file --root ./state --job JOB_ID` after successful process exit. The CLI option is a JSON argument; PowerShell and Bash quoting differ. The path resolves relative to the runtime `--root` directory; the command must write there (or use an explicit matching location). Matching fields must have identical JSON values, though other fields may exist. Optionally set `fresh: true` to require a file modification timestamp on/after the current attempt start; `FILE_CHECK_STALE` then appears as a review blocker. This is not proof of file authorship or remote delivery. A missing, invalid, or mismatched file never passes the gate. Unlike a manually passed gate, `local_file_check` cannot be satisfied with a caller-provided string.
 
 When both `fileCheck` and custom caller gates are configured, all must pass and the completion basis is `local_file_checked_plus_caller_attested`. With `fileCheck` alone, no separate `caller_attestation` gate is needed. `exit_only` cannot be combined with file checking. A matching pre-existing local file can satisfy the condition: this demonstrates **observed file contents at check time**, not that the most recent command created them, and it is not proof of a third-party delivery. The already published `v0.2.0-beta.2` archive does **not** contain this unreleased feature.
 

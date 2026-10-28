@@ -2,7 +2,7 @@
 
 [![跨平台测试](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 
-[5 分钟入门](docs/QUICKSTART.md) · [排障与诊断](docs/TROUBLESHOOTING.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [外部试用与反馈](docs/LAUNCH.md) · [npm 预览版发布流程](docs/NPM_PUBLISHING.md) · [更新记录](CHANGELOG.md)
+[5 分钟入门](docs/QUICKSTART.md) · [真实接入示例](docs/INTEGRATION.md) · [排障与诊断](docs/TROUBLESHOOTING.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [外部试用与反馈](docs/LAUNCH.md) · [npm 预览版发布流程](docs/NPM_PUBLISHING.md) · [更新记录](CHANGELOG.md)
 
 **Agent 的 CLI 会话结束了，任务真的完成了吗？**
 
@@ -70,19 +70,31 @@ node bin/arl.mjs flow --root ./trial-workspace --flow-file ./examples/verified-w
 
 **自动推进仅适用于没有额外人工 gate 的本地文件验收任务。** 人工审核、外部操作未确认、文件内容不符、以及仅按退出码判定的步骤都不能被自动视为已验收。不提供常驻守护进程，不自动重试失败任务；`--root` 中的任务记录和产物会保留。该功能尚未包含于已发布的 beta.2 安装包。
 
+## 子进程上下文与本轮产物校验（源码新增，未发布）
+
+Runtime 启动的子进程现在自动获得 `ARL_ROOT`、`ARL_TASK_ID`、`ARL_JOB_ID`、`ARL_ATTEMPT_ID` 四个环境变量。业务脚本无需手动拷贝 Job ID，即可在执行外部操作前登记 `beginOperation()`，核对真实接收端后再调用 `settleOperation()`。
+
+`fileCheck` 可以增加 `fresh: true`，拒绝仅仅内容吻合、却没有在当前 attempt 开始后更新的旧报告，错误为 `FILE_CHECK_STALE`。该选项默认关闭以兼容已有任务。文件修改时间不能证明是哪一个进程写入，也不能替代微信或远程系统的接收端核验。
+
+```sh
+npm run demo:integration
+```
+
+该可运行示例启动真实子进程，用**本地模拟接收端**完成操作登记、回执读回和本轮报告校验，不发送真实网络消息，也不需要账号凭据。实现方式及边界见[接入指南](docs/INTEGRATION.md)。以上均未包含于 beta.2 已发布安装包。
+
 ## 多步骤工作流（开发中，尚未包含在 beta.2 安装包）
 
 先提交上游 Job，再提交下游 Job，例如 `runtime.submit({taskId, key: 'review', command, dependsOn: ['produce']})`。必须是**同一 Task 内已经登记的 Job key**，不能前向引用，不允许循环依赖。随后调用 `runtime.runReady({taskId})`，仅启动依赖已经 `completed` 且资源空闲的排队 Job。上游成功退出但仍处于 `completion_candidate` 时，下游不能启动；真实结果读回后由调用方通过 gate 并 `complete()`，再次调用 `runReady` 才进入下一步。
 
-CLI：`arl plan --root ./state --task TASK_ID` 只读查看可运行与等待项；`arl run-ready --root ./state --task TASK_ID` 执行一次调度，**都必须指定 Task ID**。这不是常驻调度器或自动结果验证；前置任务若使用 `exit_only`，其 `completed` 仍只表示退出码成功。详细说明见[英文 README](README.md)。
+CLI：`arl plan --root ./state --task TASK_ID` 只读查看可运行与等待项，并返回 `nextAction` 指示下一步（如 `verify-file`、`reconcile-operation`、`review-and-gate` 或 `run-ready`）；`arl run-ready --root ./state --task TASK_ID` 执行一次调度，**都必须指定 Task ID**。这不是常驻调度器或自动结果验证；前置任务若使用 `exit_only`，其 `completed` 仍只表示退出码成功。详细说明见[英文 README](README.md)。
 
 ## 运行时实际读取本地文件（开发中，未包含在 beta.2 安装包）
 
-对于会生成 JSON 报告的任务，可以在 `submit` 中设置 `fileCheck: {path: 'report.json', jsonFields: {status: 'ready', count: 3}}`。运行时会在指定工作区目录中实际打开文件、解析 JSON、逐项检查字段，而不是接受“我已经检查过”的文字声明。
+对于会生成 JSON 报告的任务，可以在 `submit` 中设置 `fileCheck: {path: 'report.json', jsonFields: {status: 'ready', count: 3}, fresh: true}`。运行时会在指定工作区目录中实际打开文件、解析 JSON、逐项检查字段，而不是接受“我已经检查过”的文字声明。
 
 进程退出后必须处于 `completion_candidate`，再运行 `runtime.verifyFile({jobId})` 或 CLI `arl verify-file --root ./state --job JOB_ID`。验收成功才通过 `local_file_check` 门禁，`complete()` 还会在写入完成状态前重新检查文件，避免中途改坏仍被当作成功。缺文件、JSON 无效、字段值不符都会拒绝；其他未列举的 JSON 字段允许存在。该路径以运行时的 `--root` 为基准。
 
-只用文件检查时，`completionBasis=local_file_checked`，无需重复要求 `caller_attestation`；如还配置了其他人工 gate，则必须全部通过，结果标记为 `local_file_checked_plus_caller_attested`。不能把文件门禁改用人工文字通过，也不能搭配 `exit_only`。**它确认的是检查时本地文件的内容，不证明文件一定由本次任务生成，更不能据此声称微信、云端或业务系统已收到结果。** 该功能目前只在源码主线开发中，不属于已公开的 beta.2 安装包。
+只用文件检查时，`completionBasis=local_file_checked`，无需重复要求 `caller_attestation`；如还配置了其他人工 gate，则必须全部通过，结果标记为 `local_file_checked_plus_caller_attested`。不能把文件门禁改用人工文字通过，也不能搭配 `exit_only`。`fresh: true` 还能要求文件修改时间不早于当前执行轮次开始，减少历史报告误用；不传此选项则仍只检查内容。**即使通过本轮修改时间校验，也不能独立证明文件由本次任务实际写入，更不能据此声称微信、云端或业务系统已收到结果。** 该功能目前只在源码主线开发中，不属于已公开的 beta.2 安装包。
 
 ## 默认验收与可选退出码模式
 

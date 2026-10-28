@@ -18,7 +18,7 @@ export async function executeWorker(root, jobId, attemptId, {afterChildSpawn} = 
     attempt.heartbeatAt = iso();
     job.state = 'running';
     job.updatedAt = iso();
-    return {command: job.command, timeoutMs: job.timeoutMs};
+    return {command: job.command, timeoutMs: job.timeoutMs, taskId: job.taskId};
   });
   const logs = path.join(root, '.arl', 'logs');
   fs.mkdirSync(logs, {recursive: true});
@@ -35,6 +35,8 @@ export async function executeWorker(root, jobId, attemptId, {afterChildSpawn} = 
   });
   const child = spawn(command.exe, command.args, {
     cwd: command.cwd || root,
+    env: {...process.env, ARL_ROOT: root, ARL_TASK_ID: spec.taskId,
+      ARL_JOB_ID: jobId, ARL_ATTEMPT_ID: attemptId},
     stdio: ['ignore', fd, fd],
     windowsHide: true,
     shell: false
