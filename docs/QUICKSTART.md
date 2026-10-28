@@ -105,6 +105,12 @@ node bin/arl.mjs flow --root ./trial-workspace --flow-file ./examples/verified-w
 
 The two processes really write `report.json` and `summary.json` inside `trial-workspace`. Each stage is independently read back by the runtime before it can unlock its successor. Rerunning the exact same command retains previous completion records; it does not execute completed jobs a second time. To continue a pre-registered task, call `node bin/arl.mjs drive --root ./trial-workspace --task TASK_ID`. A bounded call can end while a child is still running: rerun the driver. Human evidence gates and uncertain external operations require explicit review; there is no background scheduler. Do not mistake the current source feature for the already-published beta.2 archive.
 
+## Real worker integration example (unreleased source checkout)
+
+Run `npm run demo:integration` from the checkout. This launches a detached child, injects `ARL_ROOT` and task/job/attempt IDs, registers a delivery operation, writes and reads back a **local stand-in recipient receipt**, settles the operation and verifies a fresh JSON report. It cleans up its temporary workspace. There is no actual network delivery; use your own destination read API for that. See [integration guide](INTEGRATION.md).
+
+Set `fileCheck.fresh: true` if a matching report must have been modified since the current attempt started. A stale file reports `FILE_CHECK_STALE` and cannot auto-complete through `flow` or `drive`. The default check remains content-only for backward compatibility; modification time is not independent proof of file authorship.
+
 ## Multi-step jobs from the checkout (unreleased)
 
 The source checkout now offers same-task dependent jobs. Submit a first Job with `--key produce`, then a second using `--key inspect --depends-on '["produce"]'` (also supplying `--task` and `--command-file`). The predecessor must be registered before the dependent. Inspect with `node bin/arl.mjs plan --root ./my-agent-state --task TASK_ID`, then dispatch once using `node bin/arl.mjs run-ready --root ./my-agent-state --task TASK_ID`. Check actual results, pass the first Job's gate and complete it before running `run-ready` again to launch `inspect`. These commands do not auto-verify output, and `run-ready` does not run continuously. See the [README workflow guide](../README.md#multi-step-workflows-new-unreleased).

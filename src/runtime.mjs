@@ -43,15 +43,25 @@ const normalizeFileCheck = (root, input) => {
   const absolute = path.resolve(root, input.path);
   const relative = path.relative(root, absolute);
   if (relative === '' || relative === '..' || relative.startsWith('..' + path.sep)) fail('FILE_CHECK_INVALID');
-  return {path: input.path, jsonFields: JSON.parse(JSON.stringify(input.jsonFields))};
+  if (input.fresh !== undefined && typeof input.fresh !== 'boolean') fail('FILE_CHECK_INVALID');
+  return {path: input.path, jsonFields: JSON.parse(JSON.stringify(input.jsonFields)),
+    ...(input.fresh ? {fresh: true} : {})};
 };
-const inspectFile = (root, spec) => {
+const inspectFile = (root, spec, attempt) => {
   const absolute = path.resolve(root, spec.path);
   let content;
   try { content = fs.readFileSync(absolute, 'utf8'); }
   catch (error) {
     if (error.code === 'ENOENT') fail('FILE_CHECK_MISSING');
     fail('FILE_CHECK_UNREADABLE');
+  }
+  if (spec.fresh) {
+    // Freshness is a local file-modification observation, not proof of who wrote it.
+    const started = Date.parse(attempt?.startedAt || '');
+    let modified;
+    try { modified = fs.statSync(absolute).mtimeMs; }
+    catch { fail('FILE_CHECK_UNREADABLE'); }
+    if (!Number.isFinite(started) || modified < started) fail('FILE_CHECK_STALE');
   }
   let parsed;
   try { parsed = JSON.parse(content); } catch { fail('FILE_CHECK_INVALID_JSON'); }
@@ -274,7 +284,7 @@ export class Runtime {
       const job = checkJob(state, jobId);
       if (job.state !== 'completion_candidate') fail('NOT_READY_TO_VALIDATE');
       if (!job.fileCheck) fail('FILE_CHECK_NOT_CONFIGURED');
-      const result = inspectFile(this.root, job.fileCheck);
+      const result = inspectFile(this.root, job.fileCheck, job.attempts.at(-1));
       const gate = job.gates.find(g => g.name === 'local_file_check');
       if (!gate) fail('FILE_GATE_MISSING');
       gate.passed = true;
@@ -311,7 +321,7 @@ export class Runtime {
         if (gate?.source !== 'runtime_local_file_readback') fail('FILE_VERIFICATION_REQUIRED');
         // The artifact may change after the earlier verification call.
         // Check it again immediately before committing completion.
-        inspectFile(this.root, job.fileCheck);
+        inspectFile(this.root, job.fileCheck, job.attempts.at(-1));
       }
       // No completed attested job may have only the OS process-exit gate.
       // Custom caller-evidence gates replace, rather than duplicate, the default attestation.
@@ -393,8 +403,19 @@ export class Runtime {
         return !predecessor || state.jobs[predecessor]?.state !== 'completed';
       });
       const resourcesBusy = job.resources.filter(key => state.resources[key] && state.resources[key] !== job.id);
+      const ready = job.state === 'queued' && !waitingFor.length && !resourcesBusy.length;
+      let nextAction;
+      if (job.state === 'queued') nextAction = waitingFor.length ? 'wait-dependencies' :
+        resourcesBusy.length ? 'wait-resource' : 'run-ready';
+      else if (['launching', 'running'].includes(job.state)) nextAction = 'observe';
+      else if (job.state === 'completion_candidate') nextAction = unknownEffects(job) ? 'reconcile-operation' :
+        job.gates.some(g => g.name === 'local_file_check' && !g.passed) ? 'verify-file' :
+        job.gates.some(g => !g.passed) ? 'review-and-gate' : 'complete';
+      else if (['blocked', 'failed'].includes(job.state)) nextAction = unknownEffects(job) ||
+        childDispatchUncertain(job) ? 'review-uncertain-effect' : 'inspect-before-retry';
+      else nextAction = job.state === 'completed' ? 'done' : 'stopped';
       return {jobId: job.id, key: job.key, state: job.state, dependsOn: job.dependsOn || [],
-        waitingFor, resourcesBusy, ready: job.state === 'queued' && !waitingFor.length && !resourcesBusy.length};
+        waitingFor, resourcesBusy, ready, nextAction};
     })};
   }
   runReady({taskId}) {
@@ -441,7 +462,7 @@ export class Runtime {
         const done = this.complete({jobId: job.id});
         if (!done.deduplicated) autoCompleted.push(job.id);
       } catch (error) {
-        if (/^FILE_CHECK_(MISSING|UNREADABLE|INVALID_JSON|CONTENT_MISMATCH)$/.test(error.message)) {
+        if (/^FILE_CHECK_(MISSING|UNREADABLE|INVALID_JSON|CONTENT_MISMATCH|STALE)$/.test(error.message)) {
           needsReview.push({jobId: job.id, reason: error.message});
         } else if (error.message === 'NOT_READY_TO_VALIDATE' ||
           error.message === 'JOB_NOT_COMPLETION_CANDIDATE') {
