@@ -43,7 +43,7 @@ The original CLI process did not need to remain open.
 
 **真实文件示例：** 执行 `node examples/report-file-handoff.mjs`，后台进程会生成 `report.json`，后续独立 CLI 进程读回文件并校验汇总值，通过后才允许完成任务。只需要 Node.js 20+，不依赖 npm Registry 服务。
 
-**版本：v0.2.0-beta.2，MIT 许可证，面向单机任务运行场景。**
+**已发布的最新版：v0.2.0-beta.2；源码开发候选版：v0.2.0-beta.3（尚未发布）。MIT 许可证，面向单机任务运行场景。**
 
 欢迎在 [第一批试用者反馈帖](https://github.com/Sharky0209/agent-runtime-lite/issues/3) 反馈真实体验，无需给仓库刷 Star。
 

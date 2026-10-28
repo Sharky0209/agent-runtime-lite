@@ -4,6 +4,11 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+## [0.2.0-beta.3] - Candidate, not published
+
+This candidate packages the new integration work from PR #28. It is intentionally distinct from the already published beta.2 archive; package version alone does not mean a GitHub Release or npm registry publication exists.
+
+
 - Expose a read-only `nextAction` per job in `plan`, giving users an explicit next step across queued, executing, verification, uncertain-operation and failed states.
 - Supply `ARL_ROOT`, `ARL_TASK_ID`, `ARL_JOB_ID`, and `ARL_ATTEMPT_ID` to launched child commands for direct operation registration and integration without manually threading job IDs.
 - Add opt-in `fileCheck.fresh` to reject unchanged matching artifacts from previous attempts at both verification and final completion; preserve old content-only contracts by default.

@@ -48,7 +48,7 @@ The original CLI process did not need to remain open.
 
 **A portable, dependency-free Node.js task runner with durable state, explicit recovery, and evidence-based completion.**
 
-Version 0.2.0-beta.2 · MIT licensed · Built for single-host, recoverable agent workflows.
+Latest public Release: v0.2.0-beta.2. Source development candidate: v0.2.0-beta.3 (not yet published). MIT licensed · Built for single-host, recoverable agent workflows.
 
 **First independent users:** share honest installation/use-case feedback in [the public tester thread](https://github.com/Sharky0209/agent-runtime-lite/issues/3). You do not need to star the repository.
 
