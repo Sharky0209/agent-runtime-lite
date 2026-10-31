@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import {readFileSync} from 'node:fs';
-import {Runtime, runFlow, ChatContinuationGuard} from '../src/runtime.mjs';
+import {Runtime, runFlow, previewFlow, ChatContinuationGuard} from '../src/runtime.mjs';
 
 const parsed = {_: []};
 for (let n = 2; n < process.argv.length; n++) {
@@ -53,6 +53,7 @@ const routes = {
   flow: () => runFlow(runtime, json(readFileSync(arg('flow-file'), 'utf8')),
     {waitMs: parsed['wait-ms'] ? Number(arg('wait-ms')) : 10000,
       pollMs: parsed['poll-ms'] ? Number(arg('poll-ms')) : 100}),
+  'flow-check': () => previewFlow(runtime, json(readFileSync(arg('flow-file'), 'utf8'))),
   plan: () => runtime.plan({taskId: arg('task')}),
   retry: () => runtime.retry({jobId: arg('job')}),
   recover: () => runtime.recover(),
@@ -76,7 +77,7 @@ const routes = {
 const usage = `Agent Runtime Lite
 Usage: arl <command> [options]
 
-Commands: accept, submit, start, plan, run-ready, advance, drive, flow, status, checkpoint, op-begin,
+Commands: accept, submit, start, plan, run-ready, advance, drive, flow, flow-check, status, checkpoint, op-begin,
           op-confirm, op-abort, gate, verify-file, complete, retry, recover, doctor, demo,
           chat-watch, chat-observe, chat-plan
 
@@ -106,6 +107,8 @@ Readback: arl verify-file --root ./demo --job JOB_ID
 
 One-step: arl flow --root ./demo --flow-file ./workflow.json
           Reuse named jobs on repeat invocation; drives local checks.
+Preflight: arl flow-check --root ./demo --flow-file ./workflow.json
+          Validate every step and existing job contract without writing state or launching jobs.
 Driver:   arl drive --root ./demo --task TASK_ID --wait-ms 10000
           Advances only local-file-checked jobs; manual gates still wait.
           arl advance --root ./demo --task TASK_ID  (single pass)

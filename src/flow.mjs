@@ -1,6 +1,6 @@
-// Declarative, resumable single-host workflow entrypoint.
-// Submission is keyed and durable; a repeat import reuses existing jobs.
-export async function runFlow(runtime, manifest, {waitMs = 10000, pollMs = 100} = {}) {
+// Preflight the entire manifest through the real submission contract, but keep
+// all proposed changes in memory. Invalid late steps cannot leave half-imports.
+export function previewFlow(runtime, manifest) {
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest) ||
       typeof manifest.key !== 'string' || !manifest.key.trim() ||
       typeof manifest.title !== 'string' || !manifest.title.trim() ||
@@ -21,8 +21,23 @@ export async function runFlow(runtime, manifest, {waitMs = 10000, pollMs = 100} 
     if (seen.has(step.key)) throw Error('FLOW_DUPLICATE_JOB');
     seen.add(step.key);
   }
-  // Validation precedes any state mutation. Each submit uses its existing
-  // immutable idempotency contract so interrupted imports can be repeated.
+  const snapshot = runtime.store.read();
+  const virtual = new runtime.constructor(runtime.root);
+  virtual.store = {update: fn => fn(snapshot)};
+  const accepted = virtual.accept({key: manifest.key,title: manifest.title,goal: manifest.goal || ''});
+  const jobs = manifest.jobs.map(step => {
+    const result = virtual.submit({...step,taskId:accepted.task.id});
+    return {key:step.key,action:result.deduplicated ? 'reuse' : 'create',
+      dependsOn:[...(step.dependsOn || [])]};
+  });
+  return {valid:true, taskAction:accepted.deduplicated ? 'reuse' : 'create',
+    jobCount:jobs.length,jobs};
+}
+
+// Declarative, resumable single-host workflow entrypoint.
+// Submission is keyed and durable; a repeat import reuses existing jobs.
+export async function runFlow(runtime, manifest, {waitMs = 10000, pollMs = 100} = {}) {
+  previewFlow(runtime, manifest);
   const accepted = runtime.accept({key: manifest.key,title: manifest.title,goal: manifest.goal || ''});
   const jobs = [];
   for (const step of manifest.jobs) {
