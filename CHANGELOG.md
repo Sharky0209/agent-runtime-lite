@@ -4,6 +4,9 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Add read-only `arl flow-check` and `previewFlow()` for full manifest preflight against the same per-job submission contract used in execution. Report create/reuse decisions without state writes or child launches.
+- Preflight all steps before `arl flow` registers any task, so invalid later options and existing job-key conflicts do not leave partial imports; cover new and existing workspaces with CLI regressions.
+
 ## [0.2.0-beta.3] - Candidate, not published
 
 This candidate packages the new integration work from PR #28. It is intentionally distinct from the already published beta.2 archive; package version alone does not mean a GitHub Release or npm registry publication exists.

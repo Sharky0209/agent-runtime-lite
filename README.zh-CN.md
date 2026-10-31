@@ -60,7 +60,13 @@ The original CLI process did not need to remain open.
 
 ## 一条命令运行多步骤工作流（源码新功能）
 
-用户不必逐条复制 Task/Job ID。仓库提供 [示例工作流](examples/verified-workflow.json)，可在源码目录执行：
+用户不必逐条复制 Task/Job ID。仓库提供 [示例工作流](examples/verified-workflow.json)。正式运行前可先完整预检，**不会登记任务、写入状态或启动子进程**：
+
+```sh
+node bin/arl.mjs flow-check --root ./trial-workspace --flow-file ./examples/verified-workflow.json
+```
+
+预检使用与实际提交一致的校验规则，包括每一步的参数与已有 Job 的不可变配置冲突；输出哪些任务将新建、哪些会复用。正式运行：
 
 ```sh
 node bin/arl.mjs flow --root ./trial-workspace --flow-file ./examples/verified-workflow.json --wait-ms 10000

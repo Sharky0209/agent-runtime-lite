@@ -101,7 +101,13 @@ For portable JSON arguments without shell escaping issues, supply a JSON file vi
 
 ## One-command verified workflows (new, unreleased)
 
-Instead of manually copying task/job IDs between commands, describe ordered steps once in a JSON file and drive the flow with a **single CLI invocation**:
+Instead of manually copying task/job IDs between commands, describe ordered steps once in a JSON file. **Check the full manifest before running it**:
+
+```sh
+node bin/arl.mjs flow-check --root ./trial-workspace --flow-file ./examples/verified-workflow.json
+```
+
+`flow-check` is read-only: it reports whether the task and each job would be created or reused, checks each step against the normal submission contract (including existing immutable job keys), and does not create `.arl/`, launch a command or modify existing state. Then drive the flow with a **single CLI invocation**:
 
 ```sh
 node bin/arl.mjs flow --root ./trial-workspace --flow-file ./examples/verified-workflow.json --wait-ms 10000

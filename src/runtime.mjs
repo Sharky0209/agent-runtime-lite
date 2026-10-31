@@ -5,7 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
 import {StateStore, iso, processAlive} from './state.mjs';
-export {runFlow} from './flow.mjs';
+export {runFlow, previewFlow} from './flow.mjs';
 export {ChatContinuationGuard} from './chat-continuation.mjs';
 
 const fail = (message) => { throw new Error(message); };

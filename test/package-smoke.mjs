@@ -43,6 +43,7 @@ try{
   assert.match(help,/run-ready/);
   assert.match(help,/verify-file/);
   assert.match(help,/arl flow/);
+  assert.match(help,/arl flow-check/);
   const installedVersion=JSON.parse(fs.readFileSync(path.join(client,'node_modules','agent-runtime-lite','package.json'),'utf8')).version;
   assert.equal(cli(bin,['--version']),installedVersion);
   // This runs the real detached worker and separate CLI callers from the installed package.
@@ -64,8 +65,8 @@ try{
   assert.equal(missing.status,1);
   assert.match(missing.stderr,/MISSING --key/);
   const exported=run(process.execPath,['--input-type=module','-e',
-    'import {Runtime,runFlow,ChatContinuationGuard} from "agent-runtime-lite"; console.log([Runtime,runFlow,ChatContinuationGuard].map(v=>typeof v).join(","))'],client);
-  assert.equal(exported,'function,function,function');
+    'import {Runtime,runFlow,previewFlow,ChatContinuationGuard} from "agent-runtime-lite"; console.log([Runtime,runFlow,previewFlow,ChatContinuationGuard].map(v=>typeof v).join(","))'],client);
+  assert.equal(exported,'function,function,function,function');
   const accepted=JSON.parse(cli(bin,['accept','--root',runtimeRoot,'--key','package-test',
     '--title','Separate consumer']));
   const commandFile=path.join(client,'command.json');
@@ -169,6 +170,10 @@ try{
       'const fs=require("node:fs");const x=JSON.parse(fs.readFileSync("one.json","utf8"));fs.writeFileSync("two.json",JSON.stringify({total:x.total+2}))']},
       fileCheck:{path:'two.json',jsonFields:{total:5}}}
   ]}));
+  const beforeFlow=JSON.parse(cli(bin,['flow-check','--root',flowRoot,'--flow-file',manifestFile]));
+  assert.equal(beforeFlow.taskAction,'create');
+  assert.deepEqual(beforeFlow.jobs.map(job=>job.action),['create','create']);
+  assert.equal(fs.existsSync(path.join(flowRoot,'.arl')),false);
   const flowed=JSON.parse(cli(bin,['flow','--root',flowRoot,'--flow-file',manifestFile,
     '--wait-ms','12000','--poll-ms','80']));
   assert.equal(flowed.taskState,'completed');
@@ -177,6 +182,9 @@ try{
   const secondFlow=JSON.parse(cli(bin,['flow','--root',flowRoot,'--flow-file',manifestFile,
     '--wait-ms','0']));
   assert.equal(secondFlow.deduplicated,true);
+  const afterFlow=JSON.parse(cli(bin,['flow-check','--root',flowRoot,'--flow-file',manifestFile]));
+  assert.equal(afterFlow.taskAction,'reuse');
+  assert.deepEqual(afterFlow.jobs.map(job=>job.action),['reuse','reuse']);
   assert.deepEqual(secondFlow.started,[]);
   assert.ok(secondFlow.jobs.every(item => {
     const result=JSON.parse(cli(bin,['status','--root',flowRoot,'--job',item.jobId]));

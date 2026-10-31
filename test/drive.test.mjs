@@ -203,6 +203,71 @@ test('manifest rejects forward references before creating a task',()=>{
   } finally {f.cleanup();}
 });
 
+test('flow-check previews new and existing jobs without creating state or launching children',()=>{
+  const f=make();
+  try {
+    const manifest={key:'preview',title:'Preview',jobs:[
+      {key:'first',command:cmd(report('would-run.json',{ok:true}))},
+      {key:'second',dependsOn:['first'],command:cmd('process.exit(0)')}
+    ]};
+    const manifestPath=path.join(f.root,'preview.json');
+    fs.writeFileSync(manifestPath,JSON.stringify(manifest));
+    const first=cliRun(f.root,'flow-check','--flow-file',manifestPath);
+    assert.equal(first.valid,true);
+    assert.equal(first.taskAction,'create');
+    assert.deepEqual(first.jobs.map(j=>j.action),['create','create']);
+    assert.equal(fs.existsSync(path.join(f.root,'.arl')),false);
+    assert.equal(fs.existsSync(path.join(f.root,'would-run.json')),false);
+    const taskId=f.rt.accept({key:'preview',title:'Preview'}).task.id;
+    f.rt.submit({taskId,...manifest.jobs[0]});
+    const before=fs.readFileSync(path.join(f.root,'.arl','state.json'),'utf8');
+    const again=cliRun(f.root,'flow-check','--flow-file',manifestPath);
+    assert.equal(again.taskAction,'reuse');
+    assert.deepEqual(again.jobs.map(j=>j.action),['reuse','create']);
+    assert.equal(fs.readFileSync(path.join(f.root,'.arl','state.json'),'utf8'),before);
+  } finally {f.cleanup();}
+});
+
+test('invalid late flow step does not persist earlier jobs or start a worker',()=>{
+  const f=make();
+  try {
+    const manifest={key:'late-error',title:'Late error',jobs:[
+      {key:'first',command:cmd(report('should-not-run.json',{ok:true}))},
+      {key:'second',dependsOn:['first'],command:cmd('process.exit(0)'),
+        resume:'auto_safe',readOnly:false}
+    ]};
+    const flowFile=path.join(f.root,'flow-invalid.json');
+    fs.writeFileSync(flowFile,JSON.stringify(manifest));
+    const failed=spawnSync(process.execPath,[cli,'flow','--root',f.root,'--flow-file',flowFile],
+      {encoding:'utf8',windowsHide:true,timeout:8000});
+    assert.equal(failed.status,1);
+    assert.match(failed.stderr,/AUTO_RECOVERY_REQUIRES_READ_ONLY/);
+    assert.equal(fs.existsSync(path.join(f.root,'.arl','state.json')),false);
+    assert.equal(fs.existsSync(path.join(f.root,'should-not-run.json')),false);
+  } finally {f.cleanup();}
+});
+
+test('flow preflight catches an existing immutable job conflict before importing later steps',()=>{
+  const f=make();
+  try {
+    const taskId=f.rt.accept({key:'existing',title:'Existing flow'}).task.id;
+    f.rt.submit({taskId,key:'first',command:cmd('process.exit(0)')});
+    const manifest={key:'existing',title:'Existing flow',jobs:[
+      {key:'new',command:cmd('process.exit(0)')},
+      {key:'first',command:cmd('process.exit(9)')}
+    ]};
+    const manifestPath=path.join(f.root,'existing.json');
+    fs.writeFileSync(manifestPath,JSON.stringify(manifest));
+    const before=fs.readFileSync(path.join(f.root,'.arl','state.json'),'utf8');
+    const failed=spawnSync(process.execPath,[cli,'flow','--root',f.root,'--flow-file',manifestPath],
+      {encoding:'utf8',windowsHide:true,timeout:8000});
+    assert.equal(failed.status,1);
+    assert.match(failed.stderr,/JOB_KEY_PAYLOAD_CONFLICT/);
+    assert.equal(fs.readFileSync(path.join(f.root,'.arl','state.json'),'utf8'),before);
+    assert.equal(f.rt.status({taskId}).jobs.length,1);
+  } finally {f.cleanup();}
+});
+
 test('drive rejects unbounded wait and leaves unrelated tasks untouched',async()=>{
   const f=make();
   try {
