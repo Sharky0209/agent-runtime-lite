@@ -98,6 +98,8 @@ CLI：`arl plan --root ./state --task TASK_ID` 只读查看可运行与等待项
 
 对于会生成 JSON 报告的任务，可以在 `submit` 中设置 `fileCheck: {path: 'report.json', jsonFields: {status: 'ready', count: 3}, fresh: true}`。运行时会在指定工作区目录中实际打开文件、解析 JSON、逐项检查字段，而不是接受“我已经检查过”的文字声明。
 
+**非 JSON 文件也可验收：** 如 PDF、图片、ZIP，可写 `fileCheck: {path: 'result.pdf', minBytes: 100, fresh: true}`，确认本地存在普通文件、大小达到指定字节数，并可选确认本轮确有更新。`jsonFields` 与 `minBytes` 二选一；`verify-file` 会返回 `observedBytes`。没有额外人工 gate 的情况下，`flow` 也能自动完成此类步骤。大小检查不代表 PDF 内容正确、文档可打开或外部接收端已收到。
+
 进程退出后必须处于 `completion_candidate`，再运行 `runtime.verifyFile({jobId})` 或 CLI `arl verify-file --root ./state --job JOB_ID`。验收成功才通过 `local_file_check` 门禁，`complete()` 还会在写入完成状态前重新检查文件，避免中途改坏仍被当作成功。缺文件、JSON 无效、字段值不符都会拒绝；其他未列举的 JSON 字段允许存在。该路径以运行时的 `--root` 为基准。
 
 只用文件检查时，`completionBasis=local_file_checked`，无需重复要求 `caller_attestation`；如还配置了其他人工 gate，则必须全部通过，结果标记为 `local_file_checked_plus_caller_attested`。不能把文件门禁改用人工文字通过，也不能搭配 `exit_only`。`fresh: true` 还能要求文件修改时间不早于当前执行轮次开始，减少历史报告误用；不传此选项则仍只检查内容。**即使通过本轮修改时间校验，也不能独立证明文件由本次任务实际写入，更不能据此声称微信、云端或业务系统已收到结果。** 该功能目前只在源码主线开发中，不属于已公开的 beta.2 安装包。

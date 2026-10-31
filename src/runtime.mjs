@@ -35,34 +35,44 @@ const commandShape = (command) => {
 };
 const normalizeFileCheck = (root, input) => {
   if (input == null) return null;
+  const checksJson = input?.jsonFields !== undefined;
+  const checksSize = input?.minBytes !== undefined;
   if (!input || typeof input !== 'object' || Array.isArray(input) ||
     typeof input.path !== 'string' || !input.path.trim() ||
-    !input.jsonFields || typeof input.jsonFields !== 'object' ||
-    Array.isArray(input.jsonFields) || !Object.keys(input.jsonFields).length) fail('FILE_CHECK_INVALID');
+    checksJson === checksSize ||
+    (checksJson && (!input.jsonFields || typeof input.jsonFields !== 'object' ||
+      Array.isArray(input.jsonFields) || !Object.keys(input.jsonFields).length)) ||
+    (checksSize && (!Number.isSafeInteger(input.minBytes) || input.minBytes < 1))) fail('FILE_CHECK_INVALID');
   if (path.isAbsolute(input.path) || path.win32.isAbsolute(input.path)) fail('FILE_CHECK_INVALID');
   const absolute = path.resolve(root, input.path);
   const relative = path.relative(root, absolute);
   if (relative === '' || relative === '..' || relative.startsWith('..' + path.sep)) fail('FILE_CHECK_INVALID');
   if (input.fresh !== undefined && typeof input.fresh !== 'boolean') fail('FILE_CHECK_INVALID');
-  return {path: input.path, jsonFields: JSON.parse(JSON.stringify(input.jsonFields)),
+  return {path: input.path,
+    ...(checksJson ? {jsonFields: JSON.parse(JSON.stringify(input.jsonFields))} : {minBytes:input.minBytes}),
     ...(input.fresh ? {fresh: true} : {})};
 };
 const inspectFile = (root, spec, attempt) => {
   const absolute = path.resolve(root, spec.path);
-  let content;
-  try { content = fs.readFileSync(absolute, 'utf8'); }
+  let info;
+  try { info = fs.statSync(absolute); }
   catch (error) {
     if (error.code === 'ENOENT') fail('FILE_CHECK_MISSING');
     fail('FILE_CHECK_UNREADABLE');
   }
+  if (!info.isFile()) fail('FILE_CHECK_UNREADABLE');
   if (spec.fresh) {
     // Freshness is a local file-modification observation, not proof of who wrote it.
     const started = Date.parse(attempt?.startedAt || '');
-    let modified;
-    try { modified = fs.statSync(absolute).mtimeMs; }
-    catch { fail('FILE_CHECK_UNREADABLE'); }
-    if (!Number.isFinite(started) || modified < started) fail('FILE_CHECK_STALE');
+    if (!Number.isFinite(started) || info.mtimeMs < started) fail('FILE_CHECK_STALE');
   }
+  if (spec.minBytes !== undefined) {
+    if (info.size < spec.minBytes) fail('FILE_CHECK_TOO_SMALL');
+    return {observedBytes:info.size};
+  }
+  let content;
+  try { content = fs.readFileSync(absolute, 'utf8'); }
+  catch { fail('FILE_CHECK_UNREADABLE'); }
   let parsed;
   try { parsed = JSON.parse(content); } catch { fail('FILE_CHECK_INVALID_JSON'); }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) ||
@@ -290,9 +300,11 @@ export class Runtime {
       gate.passed = true;
       gate.source = 'runtime_local_file_readback';
       gate.checkedAt = iso();
-      gate.evidence = 'JSON fields independently read and matched';
+      gate.evidence = job.fileCheck.minBytes !== undefined ?
+        `Local file size independently checked (${result.observedBytes} bytes)` :
+        'JSON fields independently read and matched';
       touch(job);
-      return {passed: true, checkedFields: result.checkedFields, gate: copy(gate)};
+      return {passed: true, ...result, gate: copy(gate)};
     });
   }
   passGate({jobId, name, evidence}) {
@@ -462,7 +474,7 @@ export class Runtime {
         const done = this.complete({jobId: job.id});
         if (!done.deduplicated) autoCompleted.push(job.id);
       } catch (error) {
-        if (/^FILE_CHECK_(MISSING|UNREADABLE|INVALID_JSON|CONTENT_MISMATCH|STALE)$/.test(error.message)) {
+        if (/^FILE_CHECK_(MISSING|UNREADABLE|INVALID_JSON|CONTENT_MISMATCH|STALE|TOO_SMALL)$/.test(error.message)) {
           needsReview.push({jobId: job.id, reason: error.message});
         } else if (error.message === 'NOT_READY_TO_VALIDATE' ||
           error.message === 'JOB_NOT_COMPLETION_CANDIDATE') {

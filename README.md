@@ -182,6 +182,8 @@ A dependency requires its predecessor to be marked `completed`. If that predeces
 
 For tasks producing local JSON, `fileCheck` gives the runtime a **concrete readback contract**, instead of relying on a caller to claim the file was inspected. This is narrower than arbitrary external-outcome verification: the runtime checks specified top-level JSON fields at the configured workspace-relative path, and rechecks them immediately before completion.
 
+For non-JSON outputs such as PDF, images or ZIP files, use `fileCheck: {path: 'report.pdf', minBytes: 100, fresh: true}` instead. This confirms a regular local file exists, meets the minimum byte count and (when `fresh` is set) was modified during the current attempt. It does **not** validate the file format, readability by another application or delivery to an external recipient. Use either `jsonFields` or `minBytes`, not both. The CLI `verify-file` result includes `observedBytes` for this check. `flow` can automatically complete size-checked jobs without custom caller gates, just as with JSON field checks.
+
 ```js
 const taskId = r.accept({key: 'checked-report', title: 'Build a checked report'}).task.id;
 const {job} = r.submit({
