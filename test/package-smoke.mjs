@@ -190,6 +190,18 @@ try{
     const result=JSON.parse(cli(bin,['status','--root',flowRoot,'--job',item.jobId]));
     return result.job.attempts.length===1;
   }));
+  // An installed consumer can verify a real non-JSON artifact and advance the flow.
+  const binaryRoot=path.join(root,'binary-state');
+  const binaryManifest=path.join(client,'binary-flow.json');
+  fs.writeFileSync(binaryManifest,JSON.stringify({key:'binary-flow',title:'Binary artifact',jobs:[
+    {key:'produce',command:{exe:process.execPath,args:['-e',
+      'require("node:fs").writeFileSync("artifact.bin",Buffer.alloc(32,7))']},
+      fileCheck:{path:'artifact.bin',minBytes:16,fresh:true}}
+  ]}));
+  const binaryResult=JSON.parse(cli(bin,['flow','--root',binaryRoot,'--flow-file',binaryManifest,
+    '--wait-ms','12000','--poll-ms','80']));
+  assert.equal(binaryResult.taskState,'completed');
+  assert.equal(fs.statSync(path.join(binaryRoot,'artifact.bin')).size,32);
   console.log('PACKAGE_INSTALL_PASS',JSON.stringify({
     version:installedVersion,platform:process.platform,cliShim:true,
     exportResolved:true,helpVerified:true,negativeExitCodes:true,

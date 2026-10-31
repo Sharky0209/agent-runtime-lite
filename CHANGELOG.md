@@ -4,6 +4,9 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Extend runtime-owned `fileCheck` to verify regular non-JSON artifacts with `minBytes` (exclusive with `jsonFields`), compatible with optional `fresh` checks. Report observed bytes and surface undersized outputs as review blockers rather than failed drivers. Preserve JSON checks and completion gates.
+- Cover direct verification, recheck-on-completion, automatic flow progression, invalid size contracts and installed-package consumer execution.
+
 - Add read-only `arl flow-check` and `previewFlow()` for full manifest preflight against the same per-job submission contract used in execution. Report create/reuse decisions without state writes or child launches.
 - Preflight all steps before `arl flow` registers any task, so invalid later options and existing job-key conflicts do not leave partial imports; cover new and existing workspaces with CLI regressions.
 

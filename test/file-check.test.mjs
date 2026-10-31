@@ -130,5 +130,44 @@ test('file check only accepts workspace-relative JSON files and bounded verifica
     ]) assert.throws(()=>f.rt.submit({taskId,key:'bad'+JSON.stringify(value),command:command(''),fileCheck:value}),/FILE_CHECK_INVALID/);
     assert.throws(()=>f.rt.submit({taskId,key:'badgate',command:command(''),gates:['local_file_check']}),/GATES_INVALID/);
     assert.throws(()=>f.rt.submit({taskId,key:'exitonly',command:command(''),completionMode:'exit_only',fileCheck:fileSpec}),/EXIT_ONLY_DISALLOWS_FILE_CHECK/);
+    for(const value of [
+      {path:'output.pdf',minBytes:0},
+      {path:'output.pdf',minBytes:1.5},
+      {path:'output.pdf',minBytes:10,jsonFields:{ok:true}}
+    ]) assert.throws(()=>f.rt.submit({taskId,key:'invalid-size'+JSON.stringify(value),command:command(''),fileCheck:value}),/FILE_CHECK_INVALID/);
+  } finally {f.cleanup();}
+});
+
+test('non-JSON artifact can be checked by minimum file size and is rechecked on completion',async()=>{
+  const f=make();
+  try {
+    const taskId=f.rt.accept({key:'artifact',title:'Generate binary artifact'}).task.id;
+    const spec={path:'output.bin',minBytes:12,fresh:true};
+    const job=f.rt.submit({taskId,key:'binary',command:command(
+      'require("node:fs").writeFileSync("output.bin",Buffer.alloc(24,1))'),fileCheck:spec}).job;
+    f.rt.start({jobId:job.id});
+    await wait(()=>f.rt.status({jobId:job.id}).job.state==='completion_candidate');
+    const result=cliCall(f.root,'verify-file','--job',job.id);
+    assert.equal(result.passed,true);
+    assert.equal(result.observedBytes,24);
+    fs.writeFileSync(path.join(f.root,'output.bin'),Buffer.alloc(3,1));
+    assert.throws(()=>f.rt.complete({jobId:job.id}),/FILE_CHECK_TOO_SMALL/);
+    fs.writeFileSync(path.join(f.root,'output.bin'),Buffer.alloc(20,1));
+    assert.equal(f.rt.complete({jobId:job.id}).job.completionBasis,'local_file_checked');
+    assert.equal(f.rt.submit({taskId,key:'binary',command:command(
+      'require("node:fs").writeFileSync("output.bin",Buffer.alloc(24,1))'),fileCheck:spec}).deduplicated,true);
+  } finally {f.cleanup();}
+});
+
+test('size-checked artifact cannot auto-complete when absent or too small',async()=>{
+  const f=make();
+  try {
+    const taskId=f.rt.accept({key:'size-fail',title:'Small file'}).task.id;
+    const job=f.rt.submit({taskId,key:'small',command:command(
+      'require("node:fs").writeFileSync("small.bin",Buffer.alloc(2))'),
+      fileCheck:{path:'small.bin',minBytes:10}}).job;
+    const result=await f.rt.drive({taskId,waitMs:5000,pollMs:75});
+    assert.ok(result.needsReview.some(j=>j.jobId===job.id && j.reason==='FILE_CHECK_TOO_SMALL'));
+    assert.equal(f.rt.status({jobId:job.id}).job.state,'completion_candidate');
   } finally {f.cleanup();}
 });
