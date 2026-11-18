@@ -2,11 +2,13 @@
 
 [![跨平台测试](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 
-[5 分钟入门](docs/QUICKSTART.md) · [真实接入示例](docs/INTEGRATION.md) · [排障与诊断](docs/TROUBLESHOOTING.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [外部试用与反馈](docs/LAUNCH.md) · [npm 预览版发布流程](docs/NPM_PUBLISHING.md) · [更新记录](CHANGELOG.md)
+[5 分钟入门](docs/QUICKSTART.md) · [框架定位与实用场景](docs/PRACTICAL_FRAMEWORK.zh-CN.md) · [真实接入示例](docs/INTEGRATION.md) · [排障与诊断](docs/TROUBLESHOOTING.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [外部试用与反馈](docs/LAUNCH.md) · [npm 预览版发布流程](docs/NPM_PUBLISHING.md) · [更新记录](CHANGELOG.md)
 
 **Agent 的 CLI 会话结束了，任务真的完成了吗？**
 
 Agent Runtime Lite 让任务状态能被后续独立 CLI 进程接手：启动真实后台子进程、保留任务记录，命令退出成功后先进入待验收状态，从 v0.2 起，新任务默认必须提交调用方验收证据才能完成：没有自定义 gate 时自动加入 `caller_attestation`；已经指定实际验收 gate 时直接使用该 gate，不要求重复确认。它是零第三方 npm 依赖的**单机任务运行框架**，不是模型服务或分布式任务队列，也不会自动证明第三方业务结果。
+
+**可运行的实际案例（当前源码，尚未进入 beta.2 安装包）：** `npm run demo:orders` 使用三阶段任务处理真实 JSONL 账单：生成审计结果、独立重新读取原始数据核账、生成 Markdown 报告。重复执行不会再次启动已经完成的任务，错误数据不会放行后续步骤。结构、输出样例、替换自己的数据和能力边界详见[框架定位与实用场景](docs/PRACTICAL_FRAMEWORK.zh-CN.md)。
 
 **注意能力边界：** `caller_attestation` 的证据是调用方声明，并不代表本库能自行核实第三方系统。仅按退出码判断的任务必须显式选择 `completionMode: 'exit_only'`（CLI：`--completion-mode exit_only`），完成时标记为 `process_exit_only`。已经落盘的 v0.1.x 任务保留旧验收规则。请看 [v0.2 升级指南](docs/MIGRATION_V02.md)。
 
