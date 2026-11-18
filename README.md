@@ -3,13 +3,15 @@
 [![Cross-platform tests](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[5-minute quickstart](docs/QUICKSTART.md) · [Practical integration](docs/INTEGRATION.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Independent trial kit](docs/LAUNCH.md) · [npm beta publishing](docs/NPM_PUBLISHING.md) · [Changelog](CHANGELOG.md)
+[5-minute quickstart](docs/QUICKSTART.md) · [Framework & use cases](docs/PRACTICAL_FRAMEWORK.md) · [Practical integration](docs/INTEGRATION.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Independent trial kit](docs/LAUNCH.md) · [npm beta publishing](docs/NPM_PUBLISHING.md) · [Changelog](CHANGELOG.md)
 
 **Your agent's CLI session ended. Did its task actually finish?**
 
 Agent Runtime Lite keeps a local task record across separate CLI invocations, launches a detached child process, and distinguishes successful command exit from **caller-attested completion**. In v0.2, every new job requires caller-supplied completion evidence by default. If no custom gates were configured, the runtime adds a mandatory `caller_attestation` gate; existing custom evidence gates fulfill the requirement without an extra duplicate step.
 
 It is a dependency-free Node.js runner for single-host workflows—not an AI model host, a distributed queue, or automatic proof of external business outcomes.
+
+**Practical framework example (current source, not beta.2):** run `npm run demo:orders` to reconcile actual JSONL invoice input through three dependent jobs: build an audit, independently re-read the source to verify it, and write a Markdown report. The durable record makes a repeat run reuse completed jobs rather than repeat the work. See [framework layers, outputs, failure behavior, and how to use your own data](docs/PRACTICAL_FRAMEWORK.md).
 
 **Important distinction:** `caller_attestation` is a statement supplied by the caller; the library does **not** independently verify external file contents or business outcomes. New jobs can explicitly use `completionMode: 'exit_only'` when OS exit code is sufficient; their completion is labeled `process_exit_only`, not attested. Previously saved v0.1.x jobs retain their original gates. See the [v0.2 migration guide](docs/MIGRATION_V02.md).
 
