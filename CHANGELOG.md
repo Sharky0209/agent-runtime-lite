@@ -4,6 +4,8 @@ This changelog records meaningful user-facing project updates, not synthetic act
 
 ## [Unreleased]
 
+- Add a runnable HTTP report-delivery adapter: reserve the external operation, PUT a JSON report, independently GET the stored document, confirm only an exact readback, and validate a fresh local receipt. Include a real loopback HTTP integration test and a negative readback-mismatch test, with a documented live-receiver contract. Source-only; no remote production service or new release is claimed.
+
 - Extend runtime-owned `fileCheck` to verify regular non-JSON artifacts with `minBytes` (exclusive with `jsonFields`), compatible with optional `fresh` checks. Report observed bytes and surface undersized outputs as review blockers rather than failed drivers. Preserve JSON checks and completion gates.
 - Cover direct verification, recheck-on-completion, automatic flow progression, invalid size contracts and installed-package consumer execution.
 
