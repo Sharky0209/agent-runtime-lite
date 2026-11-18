@@ -20,6 +20,7 @@
     "example": "node examples/quickstart.mjs",
     "demo:handoff": "node examples/session-handoff.mjs",
     "demo:integration": "node examples/integrated-job.mjs",
+    "demo:http": "node examples/http-report-delivery.mjs",
     "test:package": "node test/package-smoke.mjs"
   }
 }

@@ -3,7 +3,7 @@
 [![Cross-platform tests](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[5-minute quickstart](docs/QUICKSTART.md) · [Practical integration](docs/INTEGRATION.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Independent trial kit](docs/LAUNCH.md) · [npm beta publishing](docs/NPM_PUBLISHING.md) · [Changelog](CHANGELOG.md)
+[5-minute quickstart](docs/QUICKSTART.md) · [Practical integration](docs/INTEGRATION.md) · [Verified HTTP report delivery](docs/HTTP_REPORT_DELIVERY.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [中文说明](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Maintenance roadmap](docs/MAINTENANCE.md) · [Independent trial kit](docs/LAUNCH.md) · [npm beta publishing](docs/NPM_PUBLISHING.md) · [Changelog](CHANGELOG.md)
 
 **Your agent's CLI session ended. Did its task actually finish?**
 
@@ -51,6 +51,16 @@ The original CLI process did not need to remain open.
 Latest public Release: v0.2.0-beta.2. Source development candidate: v0.2.0-beta.3 (not yet published). MIT licensed · Built for single-host, recoverable agent workflows.
 
 **First independent users:** share honest installation/use-case feedback in [the public tester thread](https://github.com/Sharky0209/agent-runtime-lite/issues/3). You do not need to star the repository.
+
+## Practical use: verified HTTP report delivery (source checkout)
+
+A report-writing agent can publish a JSON report to an HTTP recipient and **check the recipient's stored copy before marking the task complete**. The new adapter exercises a real PUT/GET network exchange; its default demo uses a disposable local HTTP receiver, while a real service can be supplied with `ARL_HTTP_URL`.
+
+```sh
+npm run demo:http
+```
+
+The test suite also proves that an incorrect receiver readback blocks completion rather than reporting success. See the [HTTP delivery walkthrough](docs/HTTP_REPORT_DELIVERY.md) for the service contract, a usable `--run` command, and reconciliation steps. This adapter is only on the source branch, not in the published beta.2 archive.
 
 ## Why this exists
 

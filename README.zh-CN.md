@@ -2,7 +2,7 @@
 
 [![跨平台测试](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml/badge.svg)](https://github.com/Sharky0209/agent-runtime-lite/actions/workflows/test.yml)
 
-[5 分钟入门](docs/QUICKSTART.md) · [真实接入示例](docs/INTEGRATION.md) · [排障与诊断](docs/TROUBLESHOOTING.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [外部试用与反馈](docs/LAUNCH.md) · [npm 预览版发布流程](docs/NPM_PUBLISHING.md) · [更新记录](CHANGELOG.md)
+[5 分钟入门](docs/QUICKSTART.md) · [真实接入示例](docs/INTEGRATION.md) · [HTTP 报告交付验收](docs/HTTP_REPORT_DELIVERY.md) · [排障与诊断](docs/TROUBLESHOOTING.md) · [英文说明](README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [维护计划](docs/MAINTENANCE.md) · [外部试用与反馈](docs/LAUNCH.md) · [npm 预览版发布流程](docs/NPM_PUBLISHING.md) · [更新记录](CHANGELOG.md)
 
 **Agent 的 CLI 会话结束了，任务真的完成了吗？**
 
@@ -46,6 +46,16 @@ The original CLI process did not need to remain open.
 **已发布的最新版：v0.2.0-beta.2；源码开发候选版：v0.2.0-beta.3（尚未发布）。MIT 许可证，面向单机任务运行场景。**
 
 欢迎在 [第一批试用者反馈帖](https://github.com/Sharky0209/agent-runtime-lite/issues/3) 反馈真实体验，无需给仓库刷 Star。
+
+## 实际用途：HTTP 报告交付与接收端核验（源码功能）
+
+例如让 Agent 完成一份 JSON 报告后交付给自有 HTTP 服务：先登记外部操作，再通过 PUT 上传；随后调用服务端 GET，**只有读回内容与原始报告完全一致才确认交付并完成任务**。如果读回不一致，任务会失败，外部操作保持待核对，不因 HTTP 写入成功就虚报完成。
+
+```sh
+npm run demo:http
+```
+
+演示会启动真实的本地 HTTP 接收服务和独立 Worker；测试同时覆盖接收内容不一致的情况。连接自己的接收端、配置授权环境变量以及排查未确认交付的步骤见 [完整实践指南](docs/HTTP_REPORT_DELIVERY.md)。这是源码新增示例，尚未包含在已发布的 beta.2 安装包中。
 
 ## 核心功能
 
